@@ -12,18 +12,24 @@ import {
   deleteDoc,
 } from "firebase/firestore";
 import { auth, db } from "@/config/firebase";
-import { ADMIN_EMAIL, GARENA_EMAIL_SUFFIX } from "@/lib/constants";
+import { ADMIN_EMAIL } from "@/lib/constants";
+import { userEmailDocId } from "@/lib/firestore";
 import type { ForumUser, UserRole } from "@/types";
 
 const googleProvider = new GoogleAuthProvider();
 
-export function isGarenaEmail(email: string | null | undefined): boolean {
+/**
+ * Allows any @garena.* or @sea.* domain (e.g. @garena.com, @garena.sg, @sea.com.my).
+ * Also allows individual emails listed in NEXT_PUBLIC_ALLOWED_EMAILS (comma-separated).
+ */
+export function isAllowedEmail(email: string | null | undefined): boolean {
   if (!email) return false;
-  return email.toLowerCase().endsWith(GARENA_EMAIL_SUFFIX.toLowerCase());
-}
-
-function inviteDocId(email: string): string {
-  return email.toLowerCase().replace(/[.#$[\]/]/g, "_");
+  const whitelist = (process.env.NEXT_PUBLIC_ALLOWED_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean);
+  if (whitelist.includes(email.toLowerCase())) return true;
+  return /^[^@]+@(garena|sea)\..+$/i.test(email);
 }
 
 export async function signInWithGoogle(): Promise<void> {
@@ -35,30 +41,34 @@ export async function signOut(): Promise<void> {
 }
 
 /**
- * Creates the Firestore `users/{uid}` document on first @garena.com login.
- * Applies `userInvites/{id}` role (and optional `maId`) if present, then removes the invite.
+ * Ensures a `users/{uid}` document exists on Google sign-in.
+ * - If a pre-created `pendingUsers` doc matches the email, promotes it and deletes the pending doc.
+ * - Otherwise creates a new viewer account.
+ * - ADMIN_EMAIL always receives the admin role.
  */
 export async function ensureUserDocument(firebaseUser: User): Promise<ForumUser | null> {
   const email = firebaseUser.email;
-  if (!email || !isGarenaEmail(email)) return null;
+  if (!email) return null;
 
   const userRef = doc(db, "users", firebaseUser.uid);
   const snap = await getDoc(userRef);
-
   if (snap.exists()) {
     return snap.data() as ForumUser;
   }
 
   let role: UserRole = "viewer";
   let maId: string | null = null;
+  let displayName = firebaseUser.displayName ?? email.split("@")[0] ?? "User";
 
-  const inviteRef = doc(db, "userInvites", inviteDocId(email));
-  const inviteSnap = await getDoc(inviteRef);
-  if (inviteSnap.exists()) {
-    const inv = inviteSnap.data() as { role?: UserRole; maId?: string | null };
-    if (inv.role) role = inv.role;
-    if (inv.maId !== undefined) maId = inv.maId;
-    await deleteDoc(inviteRef);
+  // Check for an admin-created user doc keyed by email — migrate it to UID key
+  const emailRef = doc(db, "users", userEmailDocId(email));
+  const emailSnap = await getDoc(emailRef);
+  if (emailSnap.exists()) {
+    const pre = emailSnap.data() as { displayName?: string; role?: UserRole; maId?: string | null };
+    if (pre.role) role = pre.role;
+    if (pre.maId !== undefined) maId = pre.maId ?? null;
+    if (pre.displayName) displayName = pre.displayName;
+    await deleteDoc(emailRef);
   }
 
   if (email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
@@ -68,7 +78,7 @@ export async function ensureUserDocument(firebaseUser: User): Promise<ForumUser 
   const forumUser: Omit<ForumUser, "createdAt"> & { createdAt: ReturnType<typeof serverTimestamp> } = {
     uid: firebaseUser.uid,
     email,
-    displayName: firebaseUser.displayName ?? email.split("@")[0] ?? "User",
+    displayName,
     photoURL: firebaseUser.photoURL ?? "",
     role,
     maId: maId ?? null,

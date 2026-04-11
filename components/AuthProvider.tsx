@@ -11,7 +11,7 @@ import {
   useState,
 } from "react";
 import { auth } from "@/config/firebase";
-import { ensureUserDocument, getForumUser, isGarenaEmail } from "@/lib/auth";
+import { ensureUserDocument, getForumUser, isAllowedEmail } from "@/lib/auth";
 import type { ForumUser } from "@/types";
 
 type AuthState = {
@@ -51,7 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      if (!isGarenaEmail(user.email)) {
+      if (!isAllowedEmail(user.email)) {
         await firebaseSignOut(auth);
         setFirebaseUser(null);
         setForumUser(null);

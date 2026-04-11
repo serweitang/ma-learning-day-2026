@@ -27,5 +27,6 @@ export async function uploadToSupabase(maId: string, buffer: Buffer): Promise<st
   if (error) throw error;
 
   const { data } = supabase.storage.from(BUCKET).getPublicUrl(`${maId}.pdf`);
-  return data.publicUrl;
+  // Append timestamp to bust browser cache on reupload
+  return `${data.publicUrl}?t=${Date.now()}`;
 }

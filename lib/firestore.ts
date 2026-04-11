@@ -215,24 +215,34 @@ export async function updateUserRole(uid: string, role: UserRole, maId?: string 
   await updateDoc(doc(db, "users", uid), payload);
 }
 
+export function userEmailDocId(email: string): string {
+  return email.trim().toLowerCase().replace(/[.#$[\]/]/g, "_");
+}
+
 /**
- * Pre-assigns a role (and optional `maId`) before the user signs in with Google.
- * Processed inside `ensureUserDocument` in `lib/auth.ts`.
+ * Creates a user doc in `users` keyed by sanitized email.
+ * On first Google sign-in, `ensureUserDocument` migrates it to `users/{uid}`.
  */
-export async function createUserInvite(
-  email: string,
-  role: UserRole,
-  maId?: string | null
-): Promise<void> {
-  const norm = email.trim().toLowerCase();
-  if (!norm.endsWith("@garena.com")) {
-    throw new Error("Only @garena.com emails can be invited.");
-  }
-  const id = norm.replace(/[.#$[\]/]/g, "_");
-  await setDoc(doc(db, "userInvites", id), {
+export async function createUser(data: {
+  name: string;
+  email: string;
+  role: UserRole;
+  maId?: string | null;
+}): Promise<void> {
+  const norm = data.email.trim().toLowerCase();
+  await setDoc(doc(db, "users", userEmailDocId(norm)), {
+    uid: null,
+    displayName: data.name.trim(),
     email: norm,
-    role,
-    maId: maId ?? null,
+    photoURL: "",
+    role: data.role,
+    maId: data.maId ?? null,
     createdAt: serverTimestamp(),
   });
+}
+
+export async function getUserByEmail(email: string): Promise<ForumUser | null> {
+  const snap = await getDoc(doc(db, "users", userEmailDocId(email)));
+  if (!snap.exists()) return null;
+  return snap.data() as ForumUser;
 }

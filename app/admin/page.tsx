@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AdminGuard } from "@/components/AdminGuard";
 import { useAuth } from "@/components/AuthProvider";
-import { createMa, createUserInvite, deleteMa, listMas, listUsers, updateUserRole } from "@/lib/firestore";
+import { createMa, createUser, deleteMa, getUserByEmail, listMas, listUsers, updateUserRole } from "@/lib/firestore";
 import type { ForumUser, MA, UserRole } from "@/types";
 
 // ── CSV helpers ──────────────────────────────────────────────────────────────
@@ -53,6 +53,43 @@ function parseCsv(text: string): CsvRow[] {
     .filter((r) => r.name);
 }
 
+interface UserCsvRow {
+  name: string;
+  email: string;
+  role: UserRole;
+  maId: string | null;
+  maName: string;
+  error: string | null;
+}
+
+function parseUserCsv(text: string, mas: MA[]): UserCsvRow[] {
+  const lines = text.split(/\r?\n/).filter((l) => l.trim());
+  if (lines.length < 2) return [];
+  const headers = parseCsvLine(lines[0]).map((h) => h.toLowerCase().replace(/\s+/g, ""));
+  const nameIdx = headers.findIndex((h) => h.includes("name"));
+  const emailIdx = headers.findIndex((h) => h.includes("email"));
+  const roleIdx = headers.findIndex((h) => h.includes("role"));
+  const maIdx = headers.findIndex((h) => h.includes("ma") || h.includes("profile"));
+
+  return lines.slice(1).map((line) => {
+    const cols = parseCsvLine(line);
+    const name = cols[nameIdx]?.trim() ?? "";
+    const email = cols[emailIdx]?.trim().toLowerCase() ?? "";
+    const rawRole = cols[roleIdx]?.trim().toLowerCase() ?? "viewer";
+    const role: UserRole = ["admin", "ma", "viewer"].includes(rawRole) ? (rawRole as UserRole) : "viewer";
+    const maName = maIdx >= 0 ? (cols[maIdx]?.trim() ?? "") : "";
+    const matched = maName ? mas.find((m) => m.name.trim().toLowerCase() === maName.toLowerCase()) : null;
+    const maId = matched ? matched.id : null;
+
+    let error: string | null = null;
+    if (!name) error = "Missing name";
+    else if (!email || !email.includes("@")) error = "Invalid email";
+    else if (role === "ma" && maName && !maId) error = `MA profile "${maName}" not found`;
+
+    return { name, email, role, maId, maName, error };
+  }).filter((r) => r.name || r.email);
+}
+
 export default function AdminPage() {
   return (
     <AdminGuard>
@@ -68,11 +105,23 @@ function AdminPanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Invite form
-  const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<UserRole>("viewer");
-  const [inviteMaId, setInviteMaId] = useState<string>("");
-  const [inviteBusy, setInviteBusy] = useState(false);
+  // Create user form
+  const [createName, setCreateName] = useState("");
+  const [createEmail, setCreateEmail] = useState("");
+  const [createRole, setCreateRole] = useState<UserRole>("viewer");
+  const [createMaId, setCreateMaId] = useState<string>("");
+  const [createBusy, setCreateBusy] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [createSuccess, setCreateSuccess] = useState<string | null>(null);
+
+  // User CSV import
+  const [userCsvRows, setUserCsvRows] = useState<UserCsvRow[]>([]);
+  const [userCsvImporting, setUserCsvImporting] = useState(false);
+  const [userCsvResult, setUserCsvResult] = useState<string | null>(null);
+  const [userCsvError, setUserCsvError] = useState<string | null>(null);
+  const [userCsvDuplicates, setUserCsvDuplicates] = useState<string[]>([]);
+  const [userCsvConfirming, setUserCsvConfirming] = useState(false);
+  const userCsvInputRef = useRef<HTMLInputElement>(null);
 
   // Add MA form
   const [maName, setMaName] = useState("");
@@ -117,23 +166,82 @@ function AdminPanel() {
     }
   };
 
-  const onInvite = async (e: FormEvent) => {
+  const onCreateUser = async (e: FormEvent) => {
     e.preventDefault();
-    setInviteBusy(true);
-    setError(null);
+    setCreateBusy(true);
+    setCreateError(null);
+    setCreateSuccess(null);
     try {
-      await createUserInvite(
-        inviteEmail,
-        inviteRole,
-        inviteRole === "ma" ? inviteMaId || null : null
-      );
-      setInviteEmail("");
-      setInviteMaId("");
-      setInviteRole("viewer");
+      const existing = await getUserByEmail(createEmail);
+      if (existing) {
+        const confirmed = confirm(`A pending account for ${createEmail} already exists. Overwrite it?`);
+        if (!confirmed) {
+          setCreateBusy(false);
+          return;
+        }
+      }
+      await createUser({
+        name: createName,
+        email: createEmail,
+        role: createRole,
+        maId: createRole === "ma" ? createMaId || null : null,
+      });
+      setCreateSuccess(`Account created for ${createEmail}. They will receive their role on first login.`);
+      setCreateName("");
+      setCreateEmail("");
+      setCreateRole("viewer");
+      setCreateMaId("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Invite failed");
+      setCreateError(err instanceof Error ? err.message : "Failed to create user. Please try again.");
     } finally {
-      setInviteBusy(false);
+      setCreateBusy(false);
+    }
+  };
+
+  const onUserCsvFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      const text = evt.target?.result as string;
+      setUserCsvRows(parseUserCsv(text, mas));
+      setUserCsvResult(null);
+      setUserCsvError(null);
+      setUserCsvDuplicates([]);
+      setUserCsvConfirming(false);
+    };
+    reader.readAsText(file);
+  };
+
+  const onUserBulkImport = async (overwrite: boolean) => {
+    setUserCsvImporting(true);
+    setUserCsvResult(null);
+    setUserCsvError(null);
+    try {
+      const existingUsers = await listUsers();
+      const existingEmails = new Set(existingUsers.map((u) => u.email?.toLowerCase()));
+
+      const duplicates = userCsvRows.filter((r) => existingEmails.has(r.email.toLowerCase())).map((r) => r.email);
+
+      if (!overwrite && duplicates.length > 0) {
+        setUserCsvDuplicates(duplicates);
+        setUserCsvConfirming(true);
+        setUserCsvImporting(false);
+        return;
+      }
+
+      const toImport = overwrite ? userCsvRows : userCsvRows.filter((r) => !existingEmails.has(r.email.toLowerCase()));
+      await Promise.all(toImport.map((r) => createUser({ name: r.name, email: r.email, role: r.role, maId: r.maId })));
+      const skipped = userCsvRows.length - toImport.length;
+      setUserCsvResult(`Created ${toImport.length} account(s).${skipped > 0 ? ` Skipped ${skipped} duplicate(s).` : ""}`);
+      setUserCsvRows([]);
+      setUserCsvDuplicates([]);
+      setUserCsvConfirming(false);
+      if (userCsvInputRef.current) userCsvInputRef.current.value = "";
+    } catch (err) {
+      setUserCsvError(err instanceof Error ? err.message : "Import failed");
+    } finally {
+      setUserCsvImporting(false);
     }
   };
 
@@ -410,14 +518,24 @@ function AdminPanel() {
         )}
       </section>
 
-      {/* ── Invite by email ── */}
+      {/* ── Create user (manual) ── */}
       <section className="mt-10 rounded-xl border border-black/10 bg-white p-6 shadow-sm">
-        <h2 className="text-lg font-semibold text-garena-dark">Add / invite by email</h2>
+        <h2 className="text-lg font-semibold text-garena-dark">Create user account</h2>
         <p className="mt-1 text-xs text-garena-dark/55">
-          Creates a <code className="rounded bg-black/5 px-1">userInvites</code> document. On first successful login with
-          that email, the role (and optional MA link) is applied, then the invite is removed.
+          Pre-creates an account. The role and MA link are applied automatically when they first sign in with Google.
         </p>
-        <form className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end" onSubmit={(e) => void onInvite(e)}>
+        <form className="mt-4 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end" onSubmit={(e) => void onCreateUser(e)}>
+          <label className="flex min-w-[180px] flex-1 flex-col text-sm font-medium text-garena-dark">
+            Name
+            <input
+              className="mt-1 rounded-md border border-black/15 px-3 py-2 font-normal"
+              type="text"
+              required
+              placeholder="Full name"
+              value={createName}
+              onChange={(e) => setCreateName(e.target.value)}
+            />
+          </label>
           <label className="flex min-w-[220px] flex-1 flex-col text-sm font-medium text-garena-dark">
             Email
             <input
@@ -425,51 +543,152 @@ function AdminPanel() {
               type="email"
               required
               placeholder="colleague@garena.com"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
+              value={createEmail}
+              onChange={(e) => setCreateEmail(e.target.value)}
             />
           </label>
           <label className="flex flex-col text-sm font-medium text-garena-dark">
             Role
             <select
               className="mt-1 rounded-md border border-black/15 px-3 py-2 font-normal"
-              value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value as UserRole)}
+              value={createRole}
+              onChange={(e) => setCreateRole(e.target.value as UserRole)}
             >
               <option value="viewer">viewer</option>
               <option value="ma">ma</option>
               <option value="admin">admin</option>
             </select>
           </label>
-          {inviteRole === "ma" && (
+          {createRole === "ma" && (
             <label className="flex min-w-[180px] flex-col text-sm font-medium text-garena-dark">
               MA profile
               <select
                 className="mt-1 rounded-md border border-black/15 px-3 py-2 font-normal"
-                value={inviteMaId}
-                onChange={(e) => setInviteMaId(e.target.value)}
+                value={createMaId}
+                onChange={(e) => setCreateMaId(e.target.value)}
                 required
               >
                 <option value="">Select…</option>
-                {mas.length === 0 && (
-                  <option disabled>No profiles yet — add one above</option>
-                )}
                 {mas.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name || m.id}
-                  </option>
+                  <option key={m.id} value={m.id}>{m.name || m.id}</option>
                 ))}
               </select>
             </label>
           )}
           <button
             type="submit"
-            disabled={inviteBusy}
+            disabled={createBusy}
             className="rounded-md bg-garena-red px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
           >
-            Save invite
+            {createBusy ? "Creating…" : "Create account"}
           </button>
         </form>
+        {createError && (
+          <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{createError}</p>
+        )}
+        {createSuccess && (
+          <p className="mt-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">{createSuccess}</p>
+        )}
+      </section>
+
+      {/* ── Bulk create users from CSV ── */}
+      <section className="mt-10 rounded-xl border border-black/10 bg-white p-6 shadow-sm">
+        <h2 className="text-lg font-semibold text-garena-dark">Bulk create users from CSV</h2>
+        <p className="mt-1 text-xs text-garena-dark/55">
+          Expected columns: <code className="rounded bg-black/5 px-1">Name</code>,{" "}
+          <code className="rounded bg-black/5 px-1">Email</code>,{" "}
+          <code className="rounded bg-black/5 px-1">Role</code>,{" "}
+          <code className="rounded bg-black/5 px-1">MA Profile</code> (name, only required when role is <code className="rounded bg-black/5 px-1">ma</code>).
+        </p>
+
+        {userCsvError && (
+          <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{userCsvError}</p>
+        )}
+        {userCsvResult && (
+          <p className="mt-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">{userCsvResult}</p>
+        )}
+
+        <div className="mt-4">
+          <input ref={userCsvInputRef} type="file" accept=".csv" className="text-sm text-garena-dark" onChange={onUserCsvFile} />
+        </div>
+
+        {userCsvRows.length > 0 && (
+          <div className="mt-4">
+            <p className="mb-2 text-sm text-garena-dark/70">{userCsvRows.length} row(s) parsed — review before importing:</p>
+            <div className="overflow-x-auto rounded-md border border-black/10">
+              <table className="min-w-full text-sm">
+                <thead className="bg-garena-bg/80">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-garena-dark/60">Name</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-garena-dark/60">Email</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-garena-dark/60">Role</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-garena-dark/60">MA Profile</th>
+                    <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-garena-dark/60">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-black/5">
+                  {userCsvRows.map((r, i) => (
+                    <tr key={i} className={r.error ? "bg-red-50" : ""}>
+                      <td className="px-3 py-2 font-medium text-garena-dark">{r.name || "—"}</td>
+                      <td className="px-3 py-2 text-garena-dark/70">{r.email || "—"}</td>
+                      <td className="px-3 py-2 text-garena-dark/70">{r.role}</td>
+                      <td className="px-3 py-2 text-garena-dark/70">{r.maName || "—"}</td>
+                      <td className="px-3 py-2">
+                        {r.error ? (
+                          <span className="text-xs font-medium text-red-600">{r.error}</span>
+                        ) : (
+                          <span className="text-xs font-medium text-green-600">will create</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {userCsvConfirming && (
+              <div className="mt-3 rounded-md border border-yellow-200 bg-yellow-50 px-4 py-3">
+                <p className="text-sm font-medium text-yellow-800">
+                  The following emails already have accounts and will be overwritten:{" "}
+                  <span className="font-normal">{userCsvDuplicates.join(", ")}</span>
+                </p>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void onUserBulkImport(true)}
+                    disabled={userCsvImporting}
+                    className="rounded-md bg-yellow-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-50"
+                  >
+                    Yes, overwrite
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserCsvRows([]);
+                      setUserCsvConfirming(false);
+                      setUserCsvDuplicates([]);
+                      if (userCsvInputRef.current) userCsvInputRef.current.value = "";
+                    }}
+                    className="rounded-md border border-black/15 px-3 py-1.5 text-sm font-semibold text-garena-dark"
+                  >
+                    No, re-upload
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {!userCsvConfirming && (
+              <button
+                type="button"
+                onClick={() => void onUserBulkImport(false)}
+                disabled={userCsvImporting || userCsvRows.every((r) => !!r.error)}
+                className="mt-3 rounded-md bg-garena-red px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {userCsvImporting ? "Creating…" : "Create accounts"}
+              </button>
+            )}
+          </div>
+        )}
       </section>
 
       {/* ── Users table ── */}
