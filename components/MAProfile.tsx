@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { canUploadMemo, canEditMaProfile } from "@/lib/auth";
 import { getMa, setMaMemoUploaded, updateMaBio } from "@/lib/firestore";
-import { uploadMemoPdf } from "@/lib/storage";
 import { formatSgt } from "@/lib/datetime";
 import type { MA } from "@/types";
 import { PDFViewer } from "@/components/PDFViewer";
@@ -49,7 +48,7 @@ export function MAProfile({ initial }: Props) {
   };
 
   const onMemoFile = async (file: File | null) => {
-    if (!file || !canMemo) return;
+    if (!file || !canMemo || !firebaseUser) return;
     if (file.type !== "application/pdf") {
       setError("Please upload a PDF file.");
       return;
@@ -57,8 +56,21 @@ export function MAProfile({ initial }: Props) {
     setUploading(true);
     setError(null);
     try {
-      const url = await uploadMemoPdf(ma.id, file);
-      await setMaMemoUploaded(ma.id, url);
+      const idToken = await firebaseUser.getIdToken();
+      const formData = new FormData();
+      formData.append("maId", ma.id);
+      formData.append("file", file);
+      const res = await fetch("/api/memo/upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${idToken}` },
+        body: formData,
+      });
+      if (!res.ok) {
+        const data = (await res.json()) as { error?: string };
+        throw new Error(data.error ?? "Upload failed");
+      }
+      const { memoURL } = (await res.json()) as { memoURL: string };
+      await setMaMemoUploaded(ma.id, memoURL);
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
@@ -147,7 +159,7 @@ export function MAProfile({ initial }: Props) {
         <div className="rounded-lg border border-dashed border-black/20 bg-garena-bg/80 p-4">
           <p className="mb-2 text-sm font-medium text-garena-dark">Memo (PDF)</p>
           <p className="mb-2 text-xs text-garena-dark/60">
-            Only one PDF per MA — uploading replaces the previous file in Storage.
+            Only one PDF per MA — uploading replaces the previous file.
           </p>
           <input
             type="file"
@@ -155,6 +167,7 @@ export function MAProfile({ initial }: Props) {
             disabled={uploading}
             onChange={(e) => void onMemoFile(e.target.files?.[0] ?? null)}
           />
+          {uploading && <p className="mt-2 text-xs text-garena-dark/60">Uploading…</p>}
         </div>
       )}
 
