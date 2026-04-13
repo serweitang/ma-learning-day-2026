@@ -3,6 +3,7 @@
  * @type {import('next').NextConfig}
  */
 const nextConfig = {
+  output: "standalone",
   transpilePackages: ["firebase", "@firebase/app", "@firebase/auth", "@firebase/firestore", "@firebase/storage"],
   images: {
     remotePatterns: [
