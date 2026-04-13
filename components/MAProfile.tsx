@@ -26,6 +26,14 @@ export function MAProfile({ initial }: Props) {
     () => (forumUser ? canEditMaProfile(forumUser, ma.id) : false),
     [forumUser, ma.id]
   );
+  const staticPhotoPath = `/ma-photos/${ma.name.toLowerCase().replace(/\s+/g, "-")}.jpg`;
+
+  function resolvePhotoUrl(url: string): string {
+    const match = url.match(/drive\.google\.com\/file\/d\/([^/?]+)/);
+    if (match) return `https://lh3.googleusercontent.com/d/${match[1]}`;
+    return url;
+  }
+
   const canMemo = useMemo(
     () => (forumUser ? canUploadMemo(forumUser, ma.id) : false),
     [forumUser, ma.id]
@@ -93,22 +101,40 @@ export function MAProfile({ initial }: Props) {
       <div className="flex flex-col gap-6 sm:flex-row">
         <div className="shrink-0">
           <div className="h-40 w-40 overflow-hidden rounded-2xl border border-black/10 bg-garena-bg sm:h-48 sm:w-48">
-            {ma.photoURL ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={ma.photoURL} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-5xl font-bold text-garena-dark/20">
-                {ma.name?.charAt(0) ?? "?"}
-              </div>
-            )}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={resolvePhotoUrl(ma.photoURL || staticPhotoPath)}
+              alt={ma.name}
+              className="h-full w-full object-cover"
+              onError={(e) => {
+                const target = e.currentTarget;
+                target.style.display = "none";
+                const parent = target.parentElement;
+                if (parent && !parent.querySelector(".initials-fallback")) {
+                  const fallback = document.createElement("div");
+                  fallback.className = "initials-fallback flex h-full w-full items-center justify-center text-5xl font-bold text-garena-dark/20";
+                  fallback.textContent = ma.name?.charAt(0) ?? "?";
+                  parent.appendChild(fallback);
+                }
+              }}
+            />
           </div>
-          {/* TODO: Wire profile photo upload to Storage + update `photoURL` (admin / owning MA). */}
         </div>
 
         <div className="min-w-0 flex-1 space-y-3">
           <div>
             <h1 className="text-3xl font-bold text-garena-dark">{ma.name}</h1>
             <p className="text-garena-red">{ma.department}</p>
+            {ma.isPresenting === true && (
+              <span className="mt-1 inline-flex rounded-full bg-garena-red/10 px-2.5 py-0.5 text-xs font-medium text-garena-red">
+                Presenting MA
+              </span>
+            )}
+            {ma.isPresenting === false && (
+              <span className="mt-1 inline-flex rounded-full bg-black/5 px-2.5 py-0.5 text-xs font-medium text-garena-dark/50">
+                Non-Presenting MA
+              </span>
+            )}
           </div>
 
           {editingBio && canEdit ? (
@@ -155,38 +181,42 @@ export function MAProfile({ initial }: Props) {
         </div>
       </div>
 
-      {canMemo && (
-        <div className="rounded-lg border border-dashed border-black/20 bg-garena-bg/80 p-4">
-          <p className="mb-2 text-sm font-medium text-garena-dark">Memo (PDF)</p>
-          <p className="mb-2 text-xs text-garena-dark/60">
-            Only one PDF per MA — uploading replaces the previous file.
-          </p>
-          <input
-            type="file"
-            accept="application/pdf"
-            disabled={uploading}
-            onChange={(e) => void onMemoFile(e.target.files?.[0] ?? null)}
-          />
-          {uploading && <p className="mt-2 text-xs text-garena-dark/60">Uploading…</p>}
-        </div>
-      )}
-
-      {ma.hasMemo && ma.memoURL ? (
-        <div className="space-y-2">
-          <PDFViewer url={ma.memoURL} title={`${ma.name} memo`} />
-          {memoTime && (
-            <p className="text-xs text-garena-dark/50">
-              Last updated: {memoTime} SGT
-            </p>
+      {ma.isPresenting !== false && (
+        <>
+          {canMemo && (
+            <div className="rounded-lg border border-dashed border-black/20 bg-garena-bg/80 p-4">
+              <p className="mb-2 text-sm font-medium text-garena-dark">Memo (PDF)</p>
+              <p className="mb-2 text-xs text-garena-dark/60">
+                Only one PDF per MA — uploading replaces the previous file.
+              </p>
+              <input
+                type="file"
+                accept="application/pdf"
+                disabled={uploading}
+                onChange={(e) => void onMemoFile(e.target.files?.[0] ?? null)}
+              />
+              {uploading && <p className="mt-2 text-xs text-garena-dark/60">Uploading…</p>}
+            </div>
           )}
-        </div>
-      ) : (
-        <div className="rounded-lg border border-black/10 bg-white p-6 text-garena-dark/80">
-          <p className="font-medium text-garena-dark">No memo uploaded yet</p>
-          <p className="mt-1 text-sm">
-            When a PDF is available, it will appear here inline for everyone to read.
-          </p>
-        </div>
+
+          {ma.hasMemo && ma.memoURL ? (
+            <div className="space-y-2">
+              <PDFViewer url={ma.memoURL} title={`${ma.name} memo`} />
+              {memoTime && (
+                <p className="text-xs text-garena-dark/50">
+                  Last updated: {memoTime} SGT
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="rounded-lg border border-black/10 bg-white p-6 text-garena-dark/80">
+              <p className="font-medium text-garena-dark">No memo uploaded yet</p>
+              <p className="mt-1 text-sm">
+                When a PDF is available, it will appear here inline for everyone to read.
+              </p>
+            </div>
+          )}
+        </>
       )}
 
       <ReactionBar maId={ma.id} />

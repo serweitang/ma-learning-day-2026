@@ -28,6 +28,8 @@ export interface MA {
   memoURL: string | null;
   memoUploadedAt: Timestamp | null;
   updatedAt: Timestamp;
+  order: number | null;
+  isPresenting: boolean | null;
 }
 
 /** Firestore `comments` collection document */

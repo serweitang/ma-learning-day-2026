@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AdminGuard } from "@/components/AdminGuard";
 import { useAuth } from "@/components/AuthProvider";
-import { createMa, createUser, deleteMa, getUserByEmail, listMas, listUsers, updateUserRole } from "@/lib/firestore";
+import { createMa, createUser, deleteMa, getUserByEmail, listMas, listUsers, updateMaBulk, updateUserRole } from "@/lib/firestore";
 import type { ForumUser, MA, UserRole } from "@/types";
 
 // ── CSV helpers ──────────────────────────────────────────────────────────────
@@ -105,6 +105,11 @@ function AdminPanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // MA table (order + presenting)
+  const [tableRows, setTableRows] = useState<MA[]>([]);
+  const [tableSaving, setTableSaving] = useState(false);
+  const [tableSaved, setTableSaved] = useState(false);
+
   // Create user form
   const [createName, setCreateName] = useState("");
   const [createEmail, setCreateEmail] = useState("");
@@ -154,6 +159,11 @@ function AdminPanel() {
   useEffect(() => {
     void load();
   }, []);
+
+  useEffect(() => {
+    setTableRows(mas);
+    setTableSaved(false);
+  }, [mas]);
 
   const onSave = async (uid: string, role: UserRole, maId: string | null) => {
     setError(null);
@@ -242,6 +252,35 @@ function AdminPanel() {
       setUserCsvError(err instanceof Error ? err.message : "Import failed");
     } finally {
       setUserCsvImporting(false);
+    }
+  };
+
+  const moveRow = (index: number, direction: -1 | 1) => {
+    const next = [...tableRows];
+    const target = index + direction;
+    if (target < 0 || target >= next.length) return;
+    [next[index], next[target]] = [next[target], next[index]];
+    setTableRows(next);
+    setTableSaved(false);
+  };
+
+  const setRowPresenting = (index: number, value: boolean | null) => {
+    const next = [...tableRows];
+    next[index] = { ...next[index], isPresenting: value };
+    setTableRows(next);
+    setTableSaved(false);
+  };
+
+  const saveTable = async () => {
+    setTableSaving(true);
+    try {
+      await updateMaBulk(tableRows.map((m, i) => ({ id: m.id, order: i, isPresenting: m.isPresenting })));
+      setTableSaved(true);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to save changes");
+    } finally {
+      setTableSaving(false);
     }
   };
 
@@ -402,54 +441,101 @@ function AdminPanel() {
         </form>
       </section>
 
-      {/* ── MA Profiles List ── */}
-      <section className="mt-10 overflow-x-auto rounded-xl border border-black/10 bg-white shadow-sm">
-        <div className="px-6 py-4 border-b border-black/10">
-          <h2 className="text-lg font-semibold text-garena-dark">MA profiles ({mas.length})</h2>
+      {/* ── MA Profiles — order, presenting tag, memo, delete ── */}
+      <section className="mt-10 rounded-xl border border-black/10 bg-white shadow-sm">
+        <div className="flex items-center justify-between border-b border-black/10 px-6 py-4">
+          <div>
+            <h2 className="text-lg font-semibold text-garena-dark">MA profiles ({mas.length})</h2>
+            <p className="mt-0.5 text-xs text-garena-dark/55">Reorder with arrows, set presenting status, then click Save changes.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            {tableSaved && <span className="text-sm text-green-600">Saved.</span>}
+            <button
+              type="button"
+              onClick={() => void saveTable()}
+              disabled={tableSaving}
+              className="rounded-md bg-garena-red px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              {tableSaving ? "Saving…" : "Save changes"}
+            </button>
+          </div>
         </div>
-        <table className="min-w-full divide-y divide-black/10 text-left text-sm">
-          <thead className="bg-garena-bg/80 text-xs font-semibold uppercase tracking-wide text-garena-dark/60">
-            <tr>
-              <th className="px-4 py-3">Name</th>
-              <th className="px-4 py-3">Rotation</th>
-              <th className="px-4 py-3">Join Year</th>
-              <th className="px-4 py-3">Memo</th>
-              <th className="px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-black/5">
-            {mas.length === 0 && (
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-black/10 text-left text-sm">
+            <thead className="bg-garena-bg/80 text-xs font-semibold uppercase tracking-wide text-garena-dark/60">
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-garena-dark/50">
-                  No profiles yet — add one above or use bulk import.
-                </td>
+                <th className="px-4 py-3 w-10">#</th>
+                <th className="px-4 py-3 w-16">Order</th>
+                <th className="px-4 py-3">Name</th>
+                <th className="px-4 py-3">Rotation</th>
+                <th className="px-4 py-3">Presenting</th>
+                <th className="px-4 py-3">Memo</th>
+                <th className="px-4 py-3" />
               </tr>
-            )}
-            {mas.map((m) => (
-              <tr key={m.id} className="text-garena-dark">
-                <td className="px-4 py-3 font-medium">{m.name}</td>
-                <td className="px-4 py-3 text-garena-dark/70">{m.department || "—"}</td>
-                <td className="px-4 py-3 text-garena-dark/70">{m.joinYear ?? "—"}</td>
-                <td className="px-4 py-3">
-                  {m.hasMemo ? (
-                    <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">Uploaded</span>
-                  ) : (
-                    <span className="text-xs text-garena-dark/40">None</span>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-right">
-                  <button
-                    type="button"
-                    onClick={() => void onDeleteMa(m)}
-                    className="rounded-md border border-red-200 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
-                  >
-                    Delete
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="divide-y divide-black/5">
+              {tableRows.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="px-4 py-8 text-center text-garena-dark/50">
+                    No profiles yet — add one above or use bulk import.
+                  </td>
+                </tr>
+              )}
+              {tableRows.map((m, i) => (
+                <tr key={m.id} className="text-garena-dark">
+                  <td className="px-4 py-3 text-xs text-garena-dark/40">{i + 1}</td>
+                  <td className="px-4 py-3">
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => moveRow(i, -1)}
+                        disabled={i === 0}
+                        className="rounded px-1.5 py-0.5 text-xs hover:bg-black/5 disabled:opacity-20"
+                        title="Move up"
+                      >▲</button>
+                      <button
+                        type="button"
+                        onClick={() => moveRow(i, 1)}
+                        disabled={i === tableRows.length - 1}
+                        className="rounded px-1.5 py-0.5 text-xs hover:bg-black/5 disabled:opacity-20"
+                        title="Move down"
+                      >▼</button>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 font-medium">{m.name}</td>
+                  <td className="px-4 py-3 text-garena-dark/70">{m.department || "—"}</td>
+                  <td className="px-4 py-3">
+                    <select
+                      className="rounded-md border border-black/15 px-2 py-1 text-xs"
+                      value={m.isPresenting === null ? "" : m.isPresenting ? "true" : "false"}
+                      onChange={(e) => setRowPresenting(i, e.target.value === "" ? null : e.target.value === "true")}
+                    >
+                      <option value="">Not set</option>
+                      <option value="true">Presenting MA</option>
+                      <option value="false">Non-Presenting MA</option>
+                    </select>
+                  </td>
+                  <td className="px-4 py-3">
+                    {m.hasMemo ? (
+                      <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">Uploaded</span>
+                    ) : (
+                      <span className="text-xs text-garena-dark/40">None</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => void onDeleteMa(m)}
+                      className="rounded-md border border-red-200 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
 
       {/* ── Bulk Import CSV ── */}
