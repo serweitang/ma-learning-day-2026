@@ -258,8 +258,8 @@ export function userEmailDocId(email: string): string {
 }
 
 /**
- * Creates a user doc in `users` keyed by sanitized email.
- * On first Google sign-in, `ensureUserDocument` migrates it to `users/{uid}`.
+ * Creates a user doc in `users` keyed by sanitized email (migrated to UID on first sign-in),
+ * and adds the email to `userInvites` so the allowlist check passes.
  */
 export async function createUser(data: {
   name: string;
@@ -268,15 +268,22 @@ export async function createUser(data: {
   maId?: string | null;
 }): Promise<void> {
   const norm = data.email.trim().toLowerCase();
-  await setDoc(doc(db, "users", userEmailDocId(norm)), {
-    uid: null,
-    displayName: data.name.trim(),
-    email: norm,
-    photoURL: "",
-    role: data.role,
-    maId: data.maId ?? null,
-    createdAt: serverTimestamp(),
-  });
+  const key = userEmailDocId(norm);
+  await Promise.all([
+    setDoc(doc(db, "users", key), {
+      uid: null,
+      displayName: data.name.trim(),
+      email: norm,
+      photoURL: "",
+      role: data.role,
+      maId: data.maId ?? null,
+      createdAt: serverTimestamp(),
+    }),
+    setDoc(doc(db, "userInvites", key), {
+      email: norm,
+      createdAt: serverTimestamp(),
+    }),
+  ]);
 }
 
 export async function getUserByEmail(email: string): Promise<ForumUser | null> {

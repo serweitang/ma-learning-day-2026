@@ -57,19 +57,16 @@ interface UserCsvRow {
   name: string;
   email: string;
   role: UserRole;
-  maId: string | null;
-  maName: string;
   error: string | null;
 }
 
-function parseUserCsv(text: string, mas: MA[]): UserCsvRow[] {
+function parseUserCsv(text: string): UserCsvRow[] {
   const lines = text.split(/\r?\n/).filter((l) => l.trim());
   if (lines.length < 2) return [];
   const headers = parseCsvLine(lines[0]).map((h) => h.toLowerCase().replace(/\s+/g, ""));
   const nameIdx = headers.findIndex((h) => h.includes("name"));
   const emailIdx = headers.findIndex((h) => h.includes("email"));
   const roleIdx = headers.findIndex((h) => h.includes("role"));
-  const maIdx = headers.findIndex((h) => h.includes("ma") || h.includes("profile"));
 
   return lines.slice(1).map((line) => {
     const cols = parseCsvLine(line);
@@ -77,16 +74,12 @@ function parseUserCsv(text: string, mas: MA[]): UserCsvRow[] {
     const email = cols[emailIdx]?.trim().toLowerCase() ?? "";
     const rawRole = cols[roleIdx]?.trim().toLowerCase() ?? "viewer";
     const role: UserRole = ["admin", "ma", "viewer"].includes(rawRole) ? (rawRole as UserRole) : "viewer";
-    const maName = maIdx >= 0 ? (cols[maIdx]?.trim() ?? "") : "";
-    const matched = maName ? mas.find((m) => m.name.trim().toLowerCase() === maName.toLowerCase()) : null;
-    const maId = matched ? matched.id : null;
 
     let error: string | null = null;
     if (!name) error = "Missing name";
     else if (!email || !email.includes("@")) error = "Invalid email";
-    else if (role === "ma" && maName && !maId) error = `MA profile "${maName}" not found`;
 
-    return { name, email, role, maId, maName, error };
+    return { name, email, role, error };
   }).filter((r) => r.name || r.email);
 }
 
@@ -214,7 +207,7 @@ function AdminPanel() {
     const reader = new FileReader();
     reader.onload = (evt) => {
       const text = evt.target?.result as string;
-      setUserCsvRows(parseUserCsv(text, mas));
+      setUserCsvRows(parseUserCsv(text));
       setUserCsvResult(null);
       setUserCsvError(null);
       setUserCsvDuplicates([]);
@@ -241,7 +234,7 @@ function AdminPanel() {
       }
 
       const toImport = overwrite ? userCsvRows : userCsvRows.filter((r) => !existingEmails.has(r.email.toLowerCase()));
-      await Promise.all(toImport.map((r) => createUser({ name: r.name, email: r.email, role: r.role, maId: r.maId })));
+      await Promise.all(toImport.map((r) => createUser({ name: r.name, email: r.email, role: r.role })));
       const skipped = userCsvRows.length - toImport.length;
       setUserCsvResult(`Created ${toImport.length} account(s).${skipped > 0 ? ` Skipped ${skipped} duplicate(s).` : ""}`);
       setUserCsvRows([]);
@@ -644,8 +637,7 @@ function AdminPanel() {
         <p className="mt-1 text-xs text-garena-dark/55">
           Expected columns: <code className="rounded bg-black/5 px-1">Name</code>,{" "}
           <code className="rounded bg-black/5 px-1">Email</code>,{" "}
-          <code className="rounded bg-black/5 px-1">Role</code>,{" "}
-          <code className="rounded bg-black/5 px-1">MA Profile</code> (name, only required when role is <code className="rounded bg-black/5 px-1">ma</code>).
+          <code className="rounded bg-black/5 px-1">Role</code> (viewer / ma / admin).
         </p>
 
         {userCsvError && (
@@ -669,7 +661,6 @@ function AdminPanel() {
                     <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-garena-dark/60">Name</th>
                     <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-garena-dark/60">Email</th>
                     <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-garena-dark/60">Role</th>
-                    <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-garena-dark/60">MA Profile</th>
                     <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-garena-dark/60">Status</th>
                   </tr>
                 </thead>
@@ -679,7 +670,6 @@ function AdminPanel() {
                       <td className="px-3 py-2 font-medium text-garena-dark">{r.name || "—"}</td>
                       <td className="px-3 py-2 text-garena-dark/70">{r.email || "—"}</td>
                       <td className="px-3 py-2 text-garena-dark/70">{r.role}</td>
-                      <td className="px-3 py-2 text-garena-dark/70">{r.maName || "—"}</td>
                       <td className="px-3 py-2">
                         {r.error ? (
                           <span className="text-xs font-medium text-red-600">{r.error}</span>
