@@ -19,6 +19,8 @@ export const PLACEHOLDER_MAS: MA[] = [
     updatedAt: Timestamp.fromMillis(0),
     order: null,
     isPresenting: null,
+    school: null,
+    rotations: [],
   },
   {
     id: "ma-02",
@@ -33,6 +35,8 @@ export const PLACEHOLDER_MAS: MA[] = [
     updatedAt: Timestamp.fromMillis(0),
     order: null,
     isPresenting: null,
+    school: null,
+    rotations: [],
   },
   {
     id: "ma-03",
@@ -47,6 +51,8 @@ export const PLACEHOLDER_MAS: MA[] = [
     updatedAt: Timestamp.fromMillis(0),
     order: null,
     isPresenting: null,
+    school: null,
+    rotations: [],
   },
   {
     id: "ma-04",
@@ -61,6 +67,8 @@ export const PLACEHOLDER_MAS: MA[] = [
     updatedAt: Timestamp.fromMillis(0),
     order: null,
     isPresenting: null,
+    school: null,
+    rotations: [],
   },
   {
     id: "ma-05",
@@ -75,6 +83,8 @@ export const PLACEHOLDER_MAS: MA[] = [
     updatedAt: Timestamp.fromMillis(0),
     order: null,
     isPresenting: null,
+    school: null,
+    rotations: [],
   },
   {
     id: "ma-06",
@@ -89,6 +99,8 @@ export const PLACEHOLDER_MAS: MA[] = [
     updatedAt: Timestamp.fromMillis(0),
     order: null,
     isPresenting: null,
+    school: null,
+    rotations: [],
   },
   {
     id: "ma-07",
@@ -103,6 +115,8 @@ export const PLACEHOLDER_MAS: MA[] = [
     updatedAt: Timestamp.fromMillis(0),
     order: null,
     isPresenting: null,
+    school: null,
+    rotations: [],
   },
   {
     id: "ma-08",
@@ -117,6 +131,8 @@ export const PLACEHOLDER_MAS: MA[] = [
     updatedAt: Timestamp.fromMillis(0),
     order: null,
     isPresenting: null,
+    school: null,
+    rotations: [],
   },
   {
     id: "ma-09",
@@ -131,6 +147,8 @@ export const PLACEHOLDER_MAS: MA[] = [
     updatedAt: Timestamp.fromMillis(0),
     order: null,
     isPresenting: null,
+    school: null,
+    rotations: [],
   },
   {
     id: "ma-10",
@@ -145,6 +163,8 @@ export const PLACEHOLDER_MAS: MA[] = [
     updatedAt: Timestamp.fromMillis(0),
     order: null,
     isPresenting: null,
+    school: null,
+    rotations: [],
   },
 ];
 

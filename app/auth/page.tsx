@@ -39,7 +39,7 @@ export default function AuthPage() {
     <div className="mx-auto max-w-md px-4 py-16">
       <h1 className="text-2xl font-bold text-garena-dark">Sign in</h1>
       <p className="mt-2 text-sm text-garena-dark/70">
-        Use your Garena Google account. Only <strong>@garena.com</strong> emails can access this forum.
+        Sign in with your corporate Google account to access the forum.
       </p>
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>
@@ -53,11 +53,6 @@ export default function AuthPage() {
         <GoogleMark />
         Continue with Google
       </button>
-      <p className="mt-6 text-xs text-garena-dark/50">
-        {/* TODO: Enable Google provider + authorized domains in Firebase Console → Authentication. */}
-        First-time users receive the <code className="rounded bg-black/5 px-1">viewer</code> role unless an admin invite
-        or the default admin email applies.
-      </p>
     </div>
   );
 }

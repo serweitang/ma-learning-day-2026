@@ -1,6 +1,16 @@
 "use client";
 
 import { useMemo, useState } from "react";
+
+const LABEL_ORDER: Record<string, number> = { R1: 1, R2: 2, R3: 3, R4: 4 };
+
+/** Returns the department of the first rotation that has no learningMemoUrl (i.e. the current rotation). */
+function resolveCurrentRotationDept(rotations: { label: string; department: string; learningMemoUrl: string | null }[]): string | null {
+  if (!rotations.length) return null;
+  const sorted = [...rotations].sort((a, b) => (LABEL_ORDER[a.label] ?? 0) - (LABEL_ORDER[b.label] ?? 0));
+  const current = sorted.find((r) => !r.learningMemoUrl);
+  return current ? current.department : null;
+}
 import { useAuth } from "@/components/AuthProvider";
 import { canUploadMemo, canEditMaProfile } from "@/lib/auth";
 import { getMa, setMaMemoUploaded, updateMaBio } from "@/lib/firestore";
@@ -37,6 +47,11 @@ export function MAProfile({ initial }: Props) {
   const canMemo = useMemo(
     () => (forumUser ? canUploadMemo(forumUser, ma.id) : false),
     [forumUser, ma.id]
+  );
+
+  const currentRotationDept = useMemo(
+    () => resolveCurrentRotationDept(ma.rotations),
+    [ma.rotations]
   );
 
   const refresh = async () => {
@@ -98,14 +113,14 @@ export function MAProfile({ initial }: Props) {
         <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>
       )}
 
-      <div className="flex flex-col gap-6 sm:flex-row">
+      <div className="flex flex-col gap-6 sm:flex-row sm:items-stretch">
         <div className="shrink-0">
-          <div className="h-40 w-40 overflow-hidden rounded-2xl border border-black/10 bg-garena-bg sm:h-48 sm:w-48">
+          <div className="h-56 w-56 overflow-hidden rounded-2xl border border-black/10 bg-garena-bg sm:h-full sm:w-56">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={resolvePhotoUrl(ma.photoURL || staticPhotoPath)}
               alt={ma.name}
-              className="h-full w-full object-cover"
+              className="h-full w-full object-cover object-top"
               onError={(e) => {
                 const target = e.currentTarget;
                 target.style.display = "none";
@@ -124,16 +139,28 @@ export function MAProfile({ initial }: Props) {
         <div className="min-w-0 flex-1 space-y-3">
           <div>
             <h1 className="text-3xl font-bold text-garena-dark">{ma.name}</h1>
-            <p className="text-garena-red">{ma.department}</p>
-            {ma.isPresenting === true && (
-              <span className="mt-1 inline-flex rounded-full bg-garena-red/10 px-2.5 py-0.5 text-xs font-medium text-garena-red">
-                Presenting MA
-              </span>
+            {ma.joinYear && (
+              <p className="mt-1 text-base text-garena-dark">Joined {ma.joinYear}</p>
             )}
-            {ma.isPresenting === false && (
-              <span className="mt-1 inline-flex rounded-full bg-black/5 px-2.5 py-0.5 text-xs font-medium text-garena-dark/50">
-                Non-Presenting MA
-              </span>
+            {ma.school && (
+              <p className="mt-0.5 text-base text-garena-dark">
+                <span className="font-semibold">School</span>{" "}
+                <span className="font-normal">{ma.school}</span>
+              </p>
+            )}
+            {(ma.isPresenting === true || ma.isPresenting === false) && (
+              <div className="mt-1">
+                {ma.isPresenting === true && (
+                  <span className="inline-flex rounded-full bg-garena-red/10 px-2.5 py-0.5 text-xs font-medium text-garena-red">
+                    Presenting MA
+                  </span>
+                )}
+                {ma.isPresenting === false && (
+                  <span className="inline-flex rounded-full bg-black/5 px-2.5 py-0.5 text-xs font-medium text-garena-dark/50">
+                    Non-Presenting MA
+                  </span>
+                )}
+              </div>
             )}
           </div>
 
@@ -178,6 +205,42 @@ export function MAProfile({ initial }: Props) {
               )}
             </div>
           )}
+
+          {ma.rotations.length > 0 && (
+            <div className="pt-1">
+              <p className="mb-1.5 text-sm font-semibold text-garena-dark">Rotations Info</p>
+              <ul className="space-y-2">
+                {ma.rotations.map((r) => (
+                  <li key={r.label} className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <span className="inline-flex shrink-0 items-center rounded-full bg-garena-red/10 px-2 py-0.5 text-xs font-semibold text-garena-red">
+                      {r.label}
+                    </span>
+                    <span className="text-sm text-garena-dark">{r.department}</span>
+                    {r.learningMemoUrl && (
+                      <a
+                        href={r.learningMemoUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-xs text-garena-dark/60 hover:text-garena-red"
+                      >
+                        <span>📄</span> Learning Memo
+                      </a>
+                    )}
+                    {r.presentationUrl && (
+                      <a
+                        href={r.presentationUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-xs text-garena-dark/60 hover:text-garena-red"
+                      >
+                        <span>🖥</span> Presentation
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
       </div>
 
@@ -201,6 +264,11 @@ export function MAProfile({ initial }: Props) {
 
           {ma.hasMemo && ma.memoURL ? (
             <div className="space-y-2">
+              {currentRotationDept && (
+                <h2 className="text-lg font-semibold text-garena-dark">
+                  Rotation Memo — {currentRotationDept}
+                </h2>
+              )}
               <PDFViewer url={ma.memoURL} title={`${ma.name} memo`} />
               {memoTime && (
                 <p className="text-xs text-garena-dark/50">

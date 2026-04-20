@@ -27,7 +27,6 @@ export function MACard({ ma }: Props) {
       </div>
       <div className="flex flex-1 flex-col gap-1 p-4">
         <h2 className="text-lg font-semibold text-garena-dark group-hover:text-garena-red">{ma.name}</h2>
-        <p className="text-sm text-garena-dark/70">{ma.department}</p>
         <div className="mt-2 flex flex-wrap gap-1">
           {ma.isPresenting === true && (
             <span className="inline-flex w-fit rounded-full bg-garena-red/10 px-2 py-0.5 text-xs font-medium text-garena-red">

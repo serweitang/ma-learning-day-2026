@@ -3,10 +3,15 @@
 import { notFound, useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { MAProfile } from "@/components/MAProfile";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { getMa } from "@/lib/firestore";
 import type { MA } from "@/types";
 
 export default function MaDetailPage() {
+  return <ProtectedRoute><MaDetailContent /></ProtectedRoute>;
+}
+
+function MaDetailContent() {
   const params = useParams<{ maId: string }>();
   const raw = params?.maId;
   const maId = Array.isArray(raw) ? raw[0] : raw;

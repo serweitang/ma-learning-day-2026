@@ -16,7 +16,7 @@ import {
   type Unsubscribe,
 } from "firebase/firestore";
 import { db } from "@/config/firebase";
-import type { Comment, ForumUser, MA, Reaction, ReactionType, UserRole } from "@/types";
+import type { Comment, ForumUser, MA, Reaction, ReactionType, Rotation, UserRole } from "@/types";
 
 function reactionDocId(maId: string, authorUid: string): string {
   return `${maId}_${authorUid}`;
@@ -63,6 +63,8 @@ function normaliseMa(id: string, data: ReturnType<typeof Object.create>): MA {
     updatedAt: data.updatedAt ?? null,
     order: data.order ?? null,
     isPresenting: data.isPresenting ?? null,
+    school: data.school ?? null,
+    rotations: Array.isArray(data.rotations) ? data.rotations : [],
   };
 }
 
@@ -90,6 +92,23 @@ export async function updateMaBio(maId: string, bio: string): Promise<void> {
     doc(db, "mas", maId),
     {
       bio,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
+/** Admin-only: update joinYear, school, and rotations on an MA profile. */
+export async function updateMaProfile(
+  maId: string,
+  data: { joinYear: number | null; school: string | null; rotations: Rotation[] }
+): Promise<void> {
+  await setDoc(
+    doc(db, "mas", maId),
+    {
+      joinYear: data.joinYear,
+      school: data.school,
+      rotations: data.rotations,
       updatedAt: serverTimestamp(),
     },
     { merge: true }
@@ -264,4 +283,14 @@ export async function getUserByEmail(email: string): Promise<ForumUser | null> {
   const snap = await getDoc(doc(db, "users", userEmailDocId(email)));
   if (!snap.exists()) return null;
   return snap.data() as ForumUser;
+}
+
+/**
+ * Checks whether a user has been invited by looking them up in the `userInvites` collection
+ * (keyed by sanitised email, same encoding as `users` docs).
+ * Returns `true` if an invite document exists for this email.
+ */
+export async function checkAllowedUser(uid: string, email: string): Promise<boolean> {
+  const snap = await getDoc(doc(db, "userInvites", userEmailDocId(email)));
+  return snap.exists();
 }

@@ -16,6 +16,15 @@ export interface ForumUser {
   createdAt: Timestamp;
 }
 
+export type RotationLabel = "R1" | "R2" | "R3" | "R4";
+
+export interface Rotation {
+  label: RotationLabel;
+  department: string;
+  learningMemoUrl: string | null;
+  presentationUrl: string | null;
+}
+
 /** Firestore `mas` collection document */
 export interface MA {
   id: string;
@@ -30,6 +39,8 @@ export interface MA {
   updatedAt: Timestamp;
   order: number | null;
   isPresenting: boolean | null;
+  school: string | null;
+  rotations: Rotation[];
 }
 
 /** Firestore `comments` collection document */

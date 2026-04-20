@@ -12,11 +12,14 @@ import {
 } from "react";
 import { auth } from "@/config/firebase";
 import { ensureUserDocument, getForumUser, isAllowedEmail } from "@/lib/auth";
+import { checkAllowedUser } from "@/lib/firestore";
 import type { ForumUser } from "@/types";
 
 type AuthState = {
   firebaseUser: User | null;
   forumUser: ForumUser | null;
+  /** null = allowlist check still in progress; true/false = result */
+  isAllowed: boolean | null;
   loading: boolean;
   refreshForumUser: () => Promise<void>;
 };
@@ -28,16 +31,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [forumUser, setForumUser] = useState<ForumUser | null>(null);
+  const [isAllowed, setIsAllowed] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
   const refreshForumUser = useCallback(async () => {
     const u = auth.currentUser;
     if (!u) {
       setForumUser(null);
+      setIsAllowed(null);
       return;
     }
     const docUser = await getForumUser(u.uid);
     setForumUser(docUser);
+    // Admins are always allowed regardless of allowedUsers collection
+    if (docUser?.role === "admin") {
+      setIsAllowed(true);
+    } else {
+      const allowed = await checkAllowedUser(u.uid, u.email ?? "");
+      setIsAllowed(allowed);
+    }
   }, []);
 
   useEffect(() => {
@@ -47,6 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!user) {
         setFirebaseUser(null);
         setForumUser(null);
+        setIsAllowed(null);
         setLoading(false);
         return;
       }
@@ -55,6 +68,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await firebaseSignOut(auth);
         setFirebaseUser(null);
         setForumUser(null);
+        setIsAllowed(null);
         setLoading(false);
         router.replace("/unauthorized");
         return;
@@ -64,6 +78,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       await ensureUserDocument(user);
       const docUser = await getForumUser(user.uid);
       setForumUser(docUser);
+
+      // Admins bypass the allowedUsers check
+      if (docUser?.role === "admin") {
+        setIsAllowed(true);
+      } else {
+        const allowed = await checkAllowedUser(user.uid, user.email ?? "");
+        setIsAllowed(allowed);
+      }
+
       setLoading(false);
     });
 
@@ -81,10 +104,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     () => ({
       firebaseUser,
       forumUser,
+      isAllowed,
       loading,
       refreshForumUser,
     }),
-    [firebaseUser, forumUser, loading, refreshForumUser]
+    [firebaseUser, forumUser, isAllowed, loading, refreshForumUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

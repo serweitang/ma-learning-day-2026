@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AdminGuard } from "@/components/AdminGuard";
 import { useAuth } from "@/components/AuthProvider";
-import { createMa, createUser, deleteMa, getUserByEmail, listMas, listUsers, updateMaBulk, updateUserRole } from "@/lib/firestore";
-import type { ForumUser, MA, UserRole } from "@/types";
+import { createMa, createUser, deleteMa, getUserByEmail, listMas, listUsers, updateMaBulk, updateMaProfile, updateUserRole } from "@/lib/firestore";
+import type { ForumUser, MA, Rotation, RotationLabel, UserRole } from "@/types";
 
 // ── CSV helpers ──────────────────────────────────────────────────────────────
 
@@ -482,56 +482,17 @@ function AdminPanel() {
                 </tr>
               )}
               {tableRows.map((m, i) => (
-                <tr key={m.id} className="text-garena-dark">
-                  <td className="px-4 py-3 text-xs text-garena-dark/40">{i + 1}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-1">
-                      <button
-                        type="button"
-                        onClick={() => moveRow(i, -1)}
-                        disabled={i === 0}
-                        className="rounded px-1.5 py-0.5 text-xs hover:bg-black/5 disabled:opacity-20"
-                        title="Move up"
-                      >▲</button>
-                      <button
-                        type="button"
-                        onClick={() => moveRow(i, 1)}
-                        disabled={i === tableRows.length - 1}
-                        className="rounded px-1.5 py-0.5 text-xs hover:bg-black/5 disabled:opacity-20"
-                        title="Move down"
-                      >▼</button>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 font-medium">{m.name}</td>
-                  <td className="px-4 py-3 text-garena-dark/70">{m.department || "—"}</td>
-                  <td className="px-4 py-3">
-                    <select
-                      className="rounded-md border border-black/15 px-2 py-1 text-xs"
-                      value={m.isPresenting === null ? "" : m.isPresenting ? "true" : "false"}
-                      onChange={(e) => setRowPresenting(i, e.target.value === "" ? null : e.target.value === "true")}
-                    >
-                      <option value="">Not set</option>
-                      <option value="true">Presenting MA</option>
-                      <option value="false">Non-Presenting MA</option>
-                    </select>
-                  </td>
-                  <td className="px-4 py-3">
-                    {m.hasMemo ? (
-                      <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">Uploaded</span>
-                    ) : (
-                      <span className="text-xs text-garena-dark/40">None</span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      type="button"
-                      onClick={() => void onDeleteMa(m)}
-                      className="rounded-md border border-red-200 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
+                <MATableRow
+                  key={m.id}
+                  m={m}
+                  i={i}
+                  total={tableRows.length}
+                  onMoveUp={() => moveRow(i, -1)}
+                  onMoveDown={() => moveRow(i, 1)}
+                  onPresenting={(v) => setRowPresenting(i, v)}
+                  onDelete={() => void onDeleteMa(m)}
+                  onProfileSaved={load}
+                />
               ))}
             </tbody>
           </table>
@@ -804,6 +765,287 @@ function AdminPanel() {
         </table>
       </section>
     </div>
+  );
+}
+
+// ── URL validation helper ─────────────────────────────────────────────────────
+
+function isValidUrl(url: string): boolean {
+  try {
+    new URL(url);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ── MA Table Row (with inline profile editor) ─────────────────────────────────
+
+const ROTATION_LABELS: RotationLabel[] = ["R1", "R2", "R3", "R4"];
+
+function emptyRotation(label: RotationLabel): Rotation {
+  return { label, department: "", learningMemoUrl: null, presentationUrl: null };
+}
+
+function MATableRow({
+  m,
+  i,
+  total,
+  onMoveUp,
+  onMoveDown,
+  onPresenting,
+  onDelete,
+  onProfileSaved,
+}: {
+  m: MA;
+  i: number;
+  total: number;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  onPresenting: (v: boolean | null) => void;
+  onDelete: () => void;
+  onProfileSaved: () => Promise<void>;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [joinYear, setJoinYear] = useState<string>(m.joinYear?.toString() ?? "");
+  const [school, setSchool] = useState<string>(m.school ?? "");
+  const [rotations, setRotations] = useState<Rotation[]>(
+    m.rotations.length > 0 ? m.rotations : []
+  );
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Reset local state when parent MA changes (e.g. after reload)
+  useEffect(() => {
+    setJoinYear(m.joinYear?.toString() ?? "");
+    setSchool(m.school ?? "");
+    setRotations(m.rotations.length > 0 ? m.rotations : []);
+  }, [m.joinYear, m.school, m.rotations]);
+
+  const addRotation = () => {
+    const usedLabels = new Set(rotations.map((r) => r.label));
+    const next = ROTATION_LABELS.find((l) => !usedLabels.has(l));
+    if (!next) return;
+    setRotations([...rotations, emptyRotation(next)]);
+  };
+
+  const removeRotation = (idx: number) => {
+    setRotations(rotations.filter((_, i) => i !== idx));
+  };
+
+  const updateRotation = (idx: number, patch: Partial<Rotation>) => {
+    setRotations(rotations.map((r, i) => (i === idx ? { ...r, ...patch } : r)));
+  };
+
+  const onSaveProfile = async () => {
+    setSaveError(null);
+    setSaveSuccess(false);
+
+    // Validate URLs
+    for (const r of rotations) {
+      if (!r.department.trim()) {
+        setSaveError(`${r.label}: department name is required.`);
+        return;
+      }
+      if (r.learningMemoUrl && !isValidUrl(r.learningMemoUrl)) {
+        setSaveError(`${r.label}: Learning Memo URL is not a valid URL.`);
+        return;
+      }
+      if (r.presentationUrl && !isValidUrl(r.presentationUrl)) {
+        setSaveError(`${r.label}: Presentation URL is not a valid URL.`);
+        return;
+      }
+    }
+
+    const parsedYear = parseInt(joinYear, 10);
+    setSaving(true);
+    try {
+      await updateMaProfile(m.id, {
+        joinYear: isNaN(parsedYear) ? null : parsedYear,
+        school: school.trim() || null,
+        rotations,
+      });
+      setSaveSuccess(true);
+      await onProfileSaved();
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (e) {
+      setSaveError(e instanceof Error ? e.message : "Save failed");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <tr className="text-garena-dark">
+        <td className="px-4 py-3 text-xs text-garena-dark/40">{i + 1}</td>
+        <td className="px-4 py-3">
+          <div className="flex gap-1">
+            <button
+              type="button"
+              onClick={onMoveUp}
+              disabled={i === 0}
+              className="rounded px-1.5 py-0.5 text-xs hover:bg-black/5 disabled:opacity-20"
+              title="Move up"
+            >▲</button>
+            <button
+              type="button"
+              onClick={onMoveDown}
+              disabled={i === total - 1}
+              className="rounded px-1.5 py-0.5 text-xs hover:bg-black/5 disabled:opacity-20"
+              title="Move down"
+            >▼</button>
+          </div>
+        </td>
+        <td className="px-4 py-3 font-medium">{m.name}</td>
+        <td className="px-4 py-3 text-garena-dark/70">{m.department || "—"}</td>
+        <td className="px-4 py-3">
+          <select
+            className="rounded-md border border-black/15 px-2 py-1 text-xs"
+            value={m.isPresenting === null ? "" : m.isPresenting ? "true" : "false"}
+            onChange={(e) => onPresenting(e.target.value === "" ? null : e.target.value === "true")}
+          >
+            <option value="">Not set</option>
+            <option value="true">Presenting MA</option>
+            <option value="false">Non-Presenting MA</option>
+          </select>
+        </td>
+        <td className="px-4 py-3">
+          {m.hasMemo ? (
+            <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">Uploaded</span>
+          ) : (
+            <span className="text-xs text-garena-dark/40">None</span>
+          )}
+        </td>
+        <td className="px-4 py-3 text-right">
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setEditing(!editing)}
+              className="rounded-md border border-black/15 px-3 py-1 text-xs font-medium text-garena-dark hover:bg-black/5"
+            >
+              {editing ? "Close" : "Edit profile"}
+            </button>
+            <button
+              type="button"
+              onClick={onDelete}
+              className="rounded-md border border-red-200 px-3 py-1 text-xs font-medium text-red-600 hover:bg-red-50"
+            >
+              Delete
+            </button>
+          </div>
+        </td>
+      </tr>
+      {editing && (
+        <tr className="bg-garena-bg/40">
+          <td colSpan={7} className="px-6 py-4">
+            <div className="max-w-2xl space-y-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-garena-dark/50">
+                Profile details — {m.name}
+              </p>
+
+              {saveError && (
+                <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">{saveError}</p>
+              )}
+              {saveSuccess && (
+                <p className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-800">Saved.</p>
+              )}
+
+              {/* Join Year + School */}
+              <div className="flex flex-wrap gap-3">
+                <label className="flex w-36 flex-col text-xs font-medium text-garena-dark">
+                  Join Year
+                  <input
+                    className="mt-1 rounded-md border border-black/15 px-2 py-1.5 text-sm font-normal"
+                    type="number"
+                    placeholder="2026"
+                    min={2020}
+                    max={2100}
+                    value={joinYear}
+                    onChange={(e) => setJoinYear(e.target.value)}
+                  />
+                </label>
+                <label className="flex min-w-[200px] flex-1 flex-col text-xs font-medium text-garena-dark">
+                  School
+                  <input
+                    className="mt-1 rounded-md border border-black/15 px-2 py-1.5 text-sm font-normal"
+                    type="text"
+                    placeholder="e.g. NUS Business School"
+                    value={school}
+                    onChange={(e) => setSchool(e.target.value)}
+                  />
+                </label>
+              </div>
+
+              {/* Rotations */}
+              <div>
+                <p className="mb-2 text-xs font-medium text-garena-dark">Past Rotations (max 4)</p>
+                <div className="space-y-3">
+                  {rotations.map((r, idx) => (
+                    <div key={r.label} className="rounded-lg border border-black/10 bg-white p-3">
+                      <div className="mb-2 flex items-center justify-between">
+                        <span className="rounded-full bg-garena-red/10 px-2 py-0.5 text-xs font-semibold text-garena-red">
+                          {r.label}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => removeRotation(idx)}
+                          className="text-xs text-red-500 hover:underline"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <div className="space-y-2">
+                        <input
+                          className="w-full rounded-md border border-black/15 px-2 py-1.5 text-sm"
+                          type="text"
+                          placeholder="Department name"
+                          value={r.department}
+                          onChange={(e) => updateRotation(idx, { department: e.target.value })}
+                        />
+                        <input
+                          className="w-full rounded-md border border-black/15 px-2 py-1.5 text-sm"
+                          type="url"
+                          placeholder="Learning Memo URL (optional)"
+                          value={r.learningMemoUrl ?? ""}
+                          onChange={(e) => updateRotation(idx, { learningMemoUrl: e.target.value || null })}
+                        />
+                        <input
+                          className="w-full rounded-md border border-black/15 px-2 py-1.5 text-sm"
+                          type="url"
+                          placeholder="Presentation URL (optional)"
+                          value={r.presentationUrl ?? ""}
+                          onChange={(e) => updateRotation(idx, { presentationUrl: e.target.value || null })}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {rotations.length < 4 && (
+                  <button
+                    type="button"
+                    onClick={addRotation}
+                    className="mt-2 rounded-md border border-black/15 px-3 py-1.5 text-xs font-medium text-garena-dark hover:bg-black/5"
+                  >
+                    + Add rotation
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => void onSaveProfile()}
+                disabled={saving}
+                className="rounded-md bg-garena-red px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                {saving ? "Saving…" : "Save profile"}
+              </button>
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 

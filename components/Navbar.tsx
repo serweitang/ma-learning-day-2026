@@ -42,8 +42,13 @@ export function Navbar() {
 
         <nav className="flex items-center gap-4 text-sm font-medium text-garena-dark">
           <Link className="hover:text-garena-red" href="/profiles">
-            Meet the MAs
+            MA Profiles
           </Link>
+          {firebaseUser && (
+            <Link className="hover:text-garena-red" href="/ma-overview">
+              MA Overview
+            </Link>
+          )}
           {forumUser?.role === "admin" && (
             <Link className="hover:text-garena-red" href="/admin">
               Admin

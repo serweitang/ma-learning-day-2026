@@ -2,10 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { MACard } from "@/components/MACard";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { listMas } from "@/lib/firestore";
 import type { MA } from "@/types";
 
 export default function ProfilesPage() {
+  return <ProtectedRoute><ProfilesContent /></ProtectedRoute>;
+}
+
+function ProfilesContent() {
   const [mas, setMas] = useState<MA[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
