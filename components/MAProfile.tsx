@@ -193,7 +193,10 @@ export function MAProfile({ initial }: Props) {
             </div>
           ) : (
             <div className="space-y-2">
-              <p className="whitespace-pre-wrap text-garena-dark/90">{ma.bio}</p>
+              <p className="whitespace-pre-wrap text-garena-dark/90">
+                <span className="font-bold italic">Bio: </span>
+                <span className="italic">{ma.bio}</span>
+              </p>
               {canEdit && (
                 <button
                   type="button"
