@@ -68,7 +68,7 @@ export async function ensureUserDocument(firebaseUser: User): Promise<ForumUser 
     if (pre.role) role = pre.role;
     if (pre.maId !== undefined) maId = pre.maId ?? null;
     if (pre.displayName) displayName = pre.displayName;
-    await deleteDoc(emailRef);
+    await deleteDoc(emailRef).catch(() => {});
   }
 
   if (email.toLowerCase() === ADMIN_EMAIL.toLowerCase()) {
