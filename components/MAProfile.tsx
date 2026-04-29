@@ -4,6 +4,11 @@ import { useMemo, useState } from "react";
 
 const LABEL_ORDER: Record<string, number> = { R1: 1, R2: 2, R3: 3, R4: 4 };
 
+const NO_HORSE_MAS = ["sw", "sw dummy 2"];
+const COMMENT_HORSE_MAS = ["zhanxiao", "mitty", "jin yingjie (joyce)", "yan wei", "shang ruting", "joshua lim"];
+
+const nameKey = (n: string) => n.toLowerCase().trim();
+
 /** Returns the department of the first rotation that has no learningMemoUrl (i.e. the current rotation). */
 function resolveCurrentRotationDept(rotations: { label: string; department: string; learningMemoUrl: string | null }[]): string | null {
   if (!rotations.length) return null;
@@ -19,6 +24,7 @@ import type { MA } from "@/types";
 import { PDFViewer } from "@/components/PDFViewer";
 import { ReactionBar } from "@/components/ReactionBar";
 import { CommentSection } from "@/components/CommentSection";
+import { HorseIcon } from "@/components/HorseIcon";
 
 type Props = {
   initial: MA;
@@ -138,7 +144,12 @@ export function MAProfile({ initial }: Props) {
 
         <div className="min-w-0 flex-1 space-y-3">
           <div>
-            <h1 className="text-3xl font-bold text-garena-dark">{ma.name}</h1>
+            <h1 className="text-3xl font-bold text-garena-dark">
+              {ma.name}{" "}
+              {!NO_HORSE_MAS.includes(nameKey(ma.name)) && !COMMENT_HORSE_MAS.includes(nameKey(ma.name)) && (
+                <HorseIcon id={`horse_ma_${ma.id}`} />
+              )}
+            </h1>
             {ma.joinYear && (
               <p className="mt-1 text-base text-garena-dark">Joined {ma.joinYear}</p>
             )}
@@ -291,7 +302,10 @@ export function MAProfile({ initial }: Props) {
       )}
 
       <ReactionBar maId={ma.id} />
-      <CommentSection maId={ma.id} />
+      <CommentSection
+        maId={ma.id}
+        horseId={COMMENT_HORSE_MAS.includes(nameKey(ma.name)) ? `horse_ma_${ma.id}` : undefined}
+      />
 
       {!firebaseUser && (
         <p className="text-center text-xs text-garena-dark/50">
