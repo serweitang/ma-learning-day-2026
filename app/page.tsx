@@ -117,9 +117,6 @@ export default function HomePage() {
       <h1 className="mt-3 text-4xl font-bold text-garena-dark sm:text-5xl">
         Welcome to the<br />MA Learning Day Forum
       </h1>
-      <div className="mt-6 rounded-xl border border-garena-red/20 bg-garena-white px-4 py-3 text-lg font-medium text-garena-dark shadow-sm">
-        MA Learning Day — 8 May 2026
-      </div>
       <p className="mt-6 text-lg text-garena-dark/80">
         Connect with our Management Associates, read their memos, and join the conversation. Sign in with your corporate Google account.
       </p>

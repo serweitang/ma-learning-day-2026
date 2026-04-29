@@ -53,9 +53,11 @@ export function HorseProvider({ children }: { children: React.ReactNode }) {
       setFoundHorses([]);
       return;
     }
-    void getHorseGameDoc(firebaseUser.uid).then((gameDoc) => {
-      if (gameDoc) setFoundHorses(gameDoc.foundHorses ?? []);
-    });
+    getHorseGameDoc(firebaseUser.uid)
+      .then((gameDoc) => {
+        if (gameDoc) setFoundHorses(gameDoc.foundHorses ?? []);
+      })
+      .catch(() => {});
   }, [firebaseUser]);
 
   const recordFound = useCallback(
@@ -63,7 +65,12 @@ export function HorseProvider({ children }: { children: React.ReactNode }) {
       if (!firebaseUser) return;
       const displayName =
         firebaseUser.displayName ?? firebaseUser.email ?? "Unknown";
-      const wasNew = await recordHorseFound(firebaseUser.uid, horseId, displayName);
+      let wasNew: boolean;
+      try {
+        wasNew = await recordHorseFound(firebaseUser.uid, horseId, displayName);
+      } catch {
+        return;
+      }
       if (wasNew) {
         setFoundHorses((prev) => {
           const next = [...prev, horseId];

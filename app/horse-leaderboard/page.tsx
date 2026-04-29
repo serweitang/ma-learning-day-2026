@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { HorseIcon } from "@/components/HorseIcon";
 import { getLeaderboard, TOTAL_HORSES, type LeaderboardEntry } from "@/lib/horseGame";
 import { useHorseGame } from "@/components/HorseProvider";
 
@@ -21,8 +20,9 @@ function HorseLeaderboardContent() {
   const { foundHorses } = useHorseGame();
 
   useEffect(() => {
-    void getLeaderboard()
+    getLeaderboard()
       .then(setEntries)
+      .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
@@ -30,7 +30,6 @@ function HorseLeaderboardContent() {
     <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
       <div className="flex items-center gap-2">
         <h1 className="text-3xl font-bold text-garena-dark">Find the MA 🐴</h1>
-        <HorseIcon id="horse_leaderboard" />
       </div>
       <p className="mt-2 text-garena-dark/60">
         Hidden horse icons are scattered across the site. Hunt them all down — {TOTAL_HORSES} total.
