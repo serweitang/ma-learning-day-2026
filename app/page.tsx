@@ -70,7 +70,7 @@ export default function HomePage() {
             <div className="flex flex-col items-center gap-2">
               <Link
                 href="/profiles"
-                className="inline-flex w-full items-center justify-center rounded-lg bg-garena-red px-7 py-3 text-base font-semibold text-white shadow hover:opacity-95 sm:w-auto"
+                className="inline-flex w-full items-center justify-center rounded-lg bg-garena-red px-7 py-3 text-base font-semibold text-white shadow hover:opacity-95 sm:w-44"
               >
                 MA Profiles
               </Link>
@@ -82,12 +82,24 @@ export default function HomePage() {
             <div className="flex flex-col items-center gap-2">
               <Link
                 href="/ma-overview"
-                className="inline-flex w-full items-center justify-center rounded-lg bg-garena-red px-7 py-3 text-base font-semibold text-white shadow hover:opacity-95 sm:w-auto"
+                className="inline-flex w-full items-center justify-center rounded-lg bg-garena-red px-7 py-3 text-base font-semibold text-white shadow hover:opacity-95 sm:w-44"
               >
                 MA Overview
               </Link>
               <p className="max-w-[200px] text-center text-xs text-garena-dark/50">
                 Quick glance of all MAs, and their current rotation.
+              </p>
+            </div>
+
+            <div className="flex flex-col items-center gap-2">
+              <Link
+                href="/horse-leaderboard"
+                className="inline-flex w-full items-center justify-center rounded-lg bg-garena-red px-7 py-3 text-base font-semibold text-white shadow hover:opacity-95 sm:w-44"
+              >
+                Find the MA 🐴
+              </Link>
+              <p className="max-w-[200px] text-center text-xs text-garena-dark/50">
+                Mini game: hunt for horses hidden across the site.
               </p>
             </div>
           </div>

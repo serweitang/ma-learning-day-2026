@@ -7,6 +7,14 @@
         { "fieldPath": "maId", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "horseGame",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "totalFound", "order": "DESCENDING" },
+        { "fieldPath": "lastFoundAt", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

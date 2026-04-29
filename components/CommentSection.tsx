@@ -6,11 +6,13 @@ import { addComment, subscribeComments } from "@/lib/firestore";
 import type { Comment } from "@/types";
 import { CommentBox } from "@/components/CommentBox";
 import { RichTextEditor } from "@/components/RichTextEditor";
+import { HorseIcon } from "@/components/HorseIcon";
 
 const MAX_CHARS = 1000;
 
 type Props = {
   maId: string;
+  horseId?: string;
 };
 
 function textLengthFromHtml(html: string): number {
@@ -22,7 +24,7 @@ function textLengthFromHtml(html: string): number {
   return el.textContent?.length ?? 0;
 }
 
-export function CommentSection({ maId }: Props) {
+export function CommentSection({ maId, horseId }: Props) {
   const { firebaseUser } = useAuth();
   const [comments, setComments] = useState<Comment[]>([]);
   const [draft, setDraft] = useState("");
@@ -79,13 +81,16 @@ export function CommentSection({ maId }: Props) {
             disabled={submitting}
             placeholder="Share your thoughts…"
           />
-          <button
-            type="submit"
-            disabled={submitting || textLengthFromHtml(draft) === 0 || textLengthFromHtml(draft) > MAX_CHARS}
-            className="rounded-md bg-garena-red px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-          >
-            Post comment
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              type="submit"
+              disabled={submitting || textLengthFromHtml(draft) === 0 || textLengthFromHtml(draft) > MAX_CHARS}
+              className="rounded-md bg-garena-red px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            >
+              Post comment
+            </button>
+            {horseId && <HorseIcon id={horseId} />}
+          </div>
         </form>
       ) : (
         <p className="text-sm text-garena-dark/70">Sign in with your @garena.com account to comment.</p>

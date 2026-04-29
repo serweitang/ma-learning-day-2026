@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import { useHorseGame } from "@/components/HorseProvider";
 import { signOut } from "@/lib/auth";
+import { TOTAL_HORSES } from "@/lib/horseGame";
 
 function GarenaLogo() {
   const [failed, setFailed] = useState(false);
@@ -23,6 +25,7 @@ function GarenaLogo() {
 
 export function Navbar() {
   const { firebaseUser, forumUser, loading } = useAuth();
+  const { foundHorses } = useHorseGame();
 
   const initial =
     firebaseUser?.displayName?.charAt(0)?.toUpperCase() ??
@@ -52,6 +55,15 @@ export function Navbar() {
           {forumUser?.role === "admin" && (
             <Link className="hover:text-garena-red" href="/admin">
               Admin
+            </Link>
+          )}
+          {firebaseUser && (
+            <Link
+              href="/horse-leaderboard"
+              className="hover:text-garena-red"
+              title={`Find the MA — ${foundHorses.length}/${TOTAL_HORSES} found`}
+            >
+              🐴 {foundHorses.length}
             </Link>
           )}
           {loading ? (
