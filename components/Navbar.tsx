@@ -33,7 +33,7 @@ export function Navbar() {
     "?";
 
   return (
-    <header className="sticky top-0 z-50 border-b border-black/5 bg-garena-white shadow-sm">
+    <header className="sticky top-0 z-50 border-b border-black/10 bg-garena-white shadow">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
         <Link href="/" className="flex items-center gap-3">
           {/* TODO: Drop `public/garena-logo.png` into the repo when you have the asset. */}

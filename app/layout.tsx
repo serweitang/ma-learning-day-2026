@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
-import { Roboto } from "next/font/google";
+import { DM_Sans } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { Providers } from "@/app/providers";
 
-const roboto = Roboto({
-  weight: ["300", "400", "500", "700"],
+const dmSans = DM_Sans({
+  weight: ["400", "500", "600"],
   subsets: ["latin"],
   display: "swap",
-  variable: "--font-roboto",
+  variable: "--font-dm-sans",
 });
 
 export const metadata: Metadata = {
@@ -23,7 +23,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${roboto.variable} min-h-screen bg-garena-bg font-sans text-garena-dark antialiased`}>
+      <body className={`${dmSans.variable} min-h-screen bg-garena-bg font-sans text-garena-dark antialiased`}>
         <Providers>
           <Navbar />
           <main>{children}</main>

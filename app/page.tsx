@@ -56,7 +56,10 @@ export default function HomePage() {
   if (firebaseUser && isAllowed) {
     const firstName = firebaseUser.displayName?.split(" ")[0] ?? "there";
     return (
-      <div className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center px-4 py-16">
+      <div
+        className="flex min-h-[calc(100vh-4rem)] flex-col items-center justify-center px-4 py-16"
+        style={{ background: "linear-gradient(160deg, #fff5f5 0%, #fef2f2 100%)", borderBottom: "1px solid #fde8e8" }}
+      >
         <div className="w-full max-w-xl text-center">
           <p className="text-sm font-semibold uppercase tracking-wide text-garena-red">
             Garena · Internal
@@ -96,7 +99,7 @@ export default function HomePage() {
                 href="/horse-leaderboard"
                 className="inline-flex w-full items-center justify-center rounded-lg bg-garena-red px-7 py-3 text-base font-semibold text-white shadow hover:opacity-95 sm:w-44"
               >
-                Find the MA 🐴
+                MA Hunt 🐴
               </Link>
               <p className="max-w-[200px] text-center text-xs text-garena-dark/50">
                 Mini game: hunt for horses hidden across the site.
@@ -110,6 +113,7 @@ export default function HomePage() {
 
   // Not signed in — marketing landing
   return (
+    <div style={{ background: "linear-gradient(160deg, #fff5f5 0%, #fef2f2 100%)", borderBottom: "1px solid #fde8e8" }}>
     <div className="mx-auto max-w-3xl px-4 py-8 text-center sm:px-6 sm:py-12">
       <p className="text-sm font-semibold uppercase tracking-wide text-garena-red">
         Garena · Internal
@@ -128,6 +132,7 @@ export default function HomePage() {
           Sign in
         </Link>
       </div>
+    </div>
     </div>
   );
 }

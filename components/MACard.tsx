@@ -6,6 +6,7 @@ type Props = {
 };
 
 export function MACard({ ma }: Props) {
+
   return (
     <Link
       href={`/ma/${ma.id}`}
@@ -24,20 +25,20 @@ export function MACard({ ma }: Props) {
             {ma.name?.charAt(0) ?? "?"}
           </div>
         )}
+        {ma.isPresenting === true && (
+          <div className="absolute bottom-2 right-2 rounded-full bg-black/60 px-2 py-0.5 text-xs font-medium text-white backdrop-blur-sm">
+            Presenting MA
+          </div>
+        )}
+        {ma.isPresenting === false && (
+          <div className="absolute bottom-2 right-2 rounded-full bg-black/40 px-2 py-0.5 text-xs font-medium text-white/80 backdrop-blur-sm">
+            Non-Presenting MA
+          </div>
+        )}
       </div>
       <div className="flex flex-1 flex-col gap-1 p-4">
         <h2 className="text-lg font-semibold text-garena-dark group-hover:text-garena-red">{ma.name}</h2>
         <div className="mt-2 flex flex-wrap gap-1">
-          {ma.isPresenting === true && (
-            <span className="inline-flex w-fit rounded-full bg-garena-red/10 px-2 py-0.5 text-xs font-medium text-garena-red">
-              Presenting MA
-            </span>
-          )}
-          {ma.isPresenting === false && (
-            <span className="inline-flex w-fit rounded-full bg-black/5 px-2 py-0.5 text-xs font-medium text-garena-dark/50">
-              Non-Presenting MA
-            </span>
-          )}
           {ma.hasMemo && (
             <span className="inline-flex w-fit rounded-full bg-highlight-blue px-2 py-0.5 text-xs font-medium text-garena-dark">
               Memo available

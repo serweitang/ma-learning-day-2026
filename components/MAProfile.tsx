@@ -4,6 +4,13 @@ import { useMemo, useState } from "react";
 
 const LABEL_ORDER: Record<string, number> = { R1: 1, R2: 2, R3: 3, R4: 4 };
 
+const ROTATION_PILL_COLORS: Record<string, string> = {
+  R1: "bg-blue-100 text-blue-700",
+  R2: "bg-emerald-100 text-emerald-700",
+  R3: "bg-amber-100 text-amber-700",
+  R4: "bg-purple-100 text-purple-700",
+};
+
 const NO_HORSE_MAS = ["sw", "sw dummy 2"];
 const COMMENT_HORSE_MAS = ["zhanxiao", "mitty", "jin yingjie (joyce)", "yan wei", "shang ruting", "joshua lim"];
 
@@ -121,7 +128,7 @@ export function MAProfile({ initial }: Props) {
 
       <div className="flex flex-col gap-6 sm:flex-row sm:items-stretch">
         <div className="shrink-0">
-          <div className="h-56 w-56 overflow-hidden rounded-2xl border border-black/10 bg-garena-bg sm:h-full sm:w-56">
+          <div className="h-56 w-56 overflow-hidden rounded-full border border-black/10 bg-garena-bg">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={resolvePhotoUrl(ma.photoURL || staticPhotoPath)}
@@ -144,7 +151,7 @@ export function MAProfile({ initial }: Props) {
 
         <div className="min-w-0 flex-1 space-y-3">
           <div>
-            <h1 className="text-3xl font-bold text-garena-dark">
+            <h1 className="text-4xl font-extrabold text-garena-dark">
               {ma.name}{" "}
               {!NO_HORSE_MAS.includes(nameKey(ma.name)) && !COMMENT_HORSE_MAS.includes(nameKey(ma.name)) && (
                 <HorseIcon id={`horse_ma_${ma.id}`} />
@@ -176,7 +183,7 @@ export function MAProfile({ initial }: Props) {
           </div>
 
           {editingBio && canEdit ? (
-            <div className="space-y-2">
+            <div className="rounded-xl border border-black/10 bg-white p-4 space-y-2">
               <textarea
                 className="min-h-[120px] w-full rounded-md border border-black/10 p-3 text-sm text-garena-dark"
                 value={bioDraft}
@@ -203,7 +210,7 @@ export function MAProfile({ initial }: Props) {
               </div>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="rounded-xl border border-black/10 bg-white p-4 space-y-2">
               <p className="whitespace-pre-wrap text-garena-dark/90">
                 <span className="font-bold italic">Bio: </span>
                 <span className="italic">{ma.bio}</span>
@@ -221,12 +228,12 @@ export function MAProfile({ initial }: Props) {
           )}
 
           {ma.rotations.length > 0 && (
-            <div className="pt-1">
+            <div className="rounded-xl border border-black/10 bg-white p-4">
               <p className="mb-1.5 text-sm font-semibold text-garena-dark">Rotations Info</p>
               <ul className="space-y-2">
                 {ma.rotations.map((r) => (
                   <li key={r.label} className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                    <span className="inline-flex shrink-0 items-center rounded-full bg-garena-red/10 px-2 py-0.5 text-xs font-semibold text-garena-red">
+                    <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-semibold ${ROTATION_PILL_COLORS[r.label] ?? "bg-garena-red/10 text-garena-red"}`}>
                       {r.label}
                     </span>
                     <span className="text-sm text-garena-dark">{r.department}</span>
@@ -277,7 +284,7 @@ export function MAProfile({ initial }: Props) {
           )}
 
           {ma.hasMemo && ma.memoURL ? (
-            <div className="space-y-2">
+            <div className="rounded-xl border border-black/10 bg-white p-4 space-y-2">
               {currentRotationDept && (
                 <h2 className="text-lg font-semibold text-garena-dark">
                   Rotation Memo — {currentRotationDept}
@@ -291,7 +298,7 @@ export function MAProfile({ initial }: Props) {
               )}
             </div>
           ) : (
-            <div className="rounded-lg border border-black/10 bg-white p-6 text-garena-dark/80">
+            <div className="rounded-xl border border-black/10 bg-white p-6 text-garena-dark/80">
               <p className="font-medium text-garena-dark">No memo uploaded yet</p>
               <p className="mt-1 text-sm">
                 When a PDF is available, it will appear here inline for everyone to read.
