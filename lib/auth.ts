@@ -113,3 +113,8 @@ export function canUploadMemo(forumUser: ForumUser | null, maId: string): boolea
 export function canDeleteAnyComment(forumUser: ForumUser | null): boolean {
   return forumUser?.role === "admin";
 }
+
+export function canViewLeadershipData(forumUser: ForumUser | null): boolean {
+  if (!forumUser) return false;
+  return forumUser.role === "admin" || forumUser.role === "leadership";
+}

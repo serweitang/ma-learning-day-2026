@@ -24,8 +24,8 @@ function resolveCurrentRotationDept(rotations: { label: string; department: stri
   return current ? current.department : null;
 }
 import { useAuth } from "@/components/AuthProvider";
-import { canUploadMemo, canEditMaProfile } from "@/lib/auth";
-import { getMa, setMaMemoUploaded, updateMaBio } from "@/lib/firestore";
+import { canUploadMemo, canEditMaProfile, canViewLeadershipData } from "@/lib/auth";
+import { getMa, setMaMemoUploaded, updateMaBio, updateMaLeadershipData } from "@/lib/firestore";
 import { formatSgt } from "@/lib/datetime";
 import type { MA } from "@/types";
 import { PDFViewer } from "@/components/PDFViewer";
@@ -42,12 +42,21 @@ export function MAProfile({ initial }: Props) {
   const [ma, setMa] = useState<MA>(initial);
   const [bioDraft, setBioDraft] = useState(initial.bio ?? "");
   const [editingBio, setEditingBio] = useState(false);
+  const [editingStrengths, setEditingStrengths] = useState(false);
+  const [editingAreas, setEditingAreas] = useState(false);
+  const [strengthsDraft, setStrengthsDraft] = useState((initial.strengths ?? []).join("\n"));
+  const [areasDraft, setAreasDraft] = useState((initial.areasForDevelopment ?? []).join("\n"));
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const canEdit = useMemo(
     () => (forumUser ? canEditMaProfile(forumUser, ma.id) : false),
     [forumUser, ma.id]
+  );
+
+  const canViewLeadership = useMemo(
+    () => canViewLeadershipData(forumUser),
+    [forumUser]
   );
   const staticPhotoPath = `/ma-photos/${ma.name.toLowerCase().replace(/\s+/g, "-")}.jpg`;
 
@@ -80,6 +89,34 @@ export function MAProfile({ initial }: Props) {
       setEditingBio(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save bio");
+    }
+  };
+
+  const saveStrengths = async () => {
+    setError(null);
+    try {
+      await updateMaLeadershipData(ma.id, {
+        strengths: strengthsDraft.split("\n").map((s) => s.trim()).filter(Boolean),
+        areasForDevelopment: ma.areasForDevelopment,
+      });
+      await refresh();
+      setEditingStrengths(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save");
+    }
+  };
+
+  const saveAreas = async () => {
+    setError(null);
+    try {
+      await updateMaLeadershipData(ma.id, {
+        strengths: ma.strengths,
+        areasForDevelopment: areasDraft.split("\n").map((s) => s.trim()).filter(Boolean),
+      });
+      await refresh();
+      setEditingAreas(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Could not save");
     }
   };
 
@@ -226,44 +263,130 @@ export function MAProfile({ initial }: Props) {
               )}
             </div>
           )}
+        </div>
+      </div>
 
+      {(ma.rotations.length > 0 || canViewLeadership) && (
+        <div className={`grid w-full items-stretch gap-4 ${canViewLeadership ? "grid-cols-1 md:grid-cols-3" : "grid-cols-1"}`}>
+          {/* Box 1 — Rotations */}
           {ma.rotations.length > 0 && (
-            <div className="rounded-xl border border-black/10 bg-white p-4">
-              <p className="mb-1.5 text-sm font-semibold text-garena-dark">Rotations Info</p>
+            <div className="rounded-xl border border-blue-100 bg-blue-50 p-4">
+              <p className="mb-2 text-sm font-semibold text-garena-dark">Rotations Info</p>
               <ul className="space-y-2">
                 {ma.rotations.map((r) => (
-                  <li key={r.label} className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                    <span className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-xs font-semibold ${ROTATION_PILL_COLORS[r.label] ?? "bg-garena-red/10 text-garena-red"}`}>
-                      {r.label}
-                    </span>
-                    <span className="text-sm text-garena-dark">{r.department}</span>
-                    {r.learningMemoUrl && (
-                      <a
-                        href={r.learningMemoUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-xs text-garena-dark/60 hover:text-garena-red"
-                      >
-                        <span>📄</span> Learning Memo
-                      </a>
-                    )}
-                    {r.presentationUrl && (
-                      <a
-                        href={r.presentationUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-1 text-xs text-garena-dark/60 hover:text-garena-red"
-                      >
-                        <span>🖥</span> Presentation
-                      </a>
+                  <li key={r.label}>
+                    <div className="flex w-full items-start gap-[10px]">
+                      <span className={`flex w-8 shrink-0 items-center justify-center rounded-full py-0.5 text-xs font-semibold ${ROTATION_PILL_COLORS[r.label] ?? "bg-garena-red/10 text-garena-red"}`}>
+                        {r.label}
+                      </span>
+                      <span className="flex-1 text-sm text-garena-dark">{r.department}</span>
+                      {canViewLeadership && (
+                        <span className="min-w-[36px] shrink-0 whitespace-nowrap text-right text-xs font-medium text-garena-dark/70">
+                          {r.performanceGrade ? `[${r.performanceGrade}]` : ""}
+                        </span>
+                      )}
+                    </div>
+                    {(r.learningMemoUrl || r.presentationUrl) && (
+                      <div className="mt-0.5 flex items-center gap-3 pl-[42px]">
+                        {r.learningMemoUrl && (
+                          <a href={r.learningMemoUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-garena-dark/60 hover:text-garena-red">
+                            <span>📄</span> Learning Memo
+                          </a>
+                        )}
+                        {r.presentationUrl && (
+                          <a href={r.presentationUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-garena-dark/60 hover:text-garena-red">
+                            <span>🖥</span> Presentation
+                          </a>
+                        )}
+                      </div>
                     )}
                   </li>
                 ))}
               </ul>
             </div>
           )}
+
+          {/* Box 2 — Strengths (leadership only) */}
+          {canViewLeadership && (
+            <div className="flex flex-col rounded-xl border border-green-100 bg-green-50 p-4">
+              <p className="mb-1.5 text-sm font-semibold text-garena-dark">Strengths</p>
+              {editingStrengths ? (
+                <>
+                  <textarea
+                    className="min-h-[120px] w-full flex-1 rounded-md border border-green-200 bg-white p-2 text-sm text-garena-dark"
+                    placeholder="One strength per line…"
+                    value={strengthsDraft}
+                    onChange={(e) => setStrengthsDraft(e.target.value)}
+                  />
+                  <div className="mt-2 flex justify-end gap-2">
+                    <button type="button" className="rounded-md border border-black/10 bg-white px-3 py-1.5 text-sm" onClick={() => setEditingStrengths(false)}>Cancel</button>
+                    <button type="button" className="rounded-md bg-garena-red px-3 py-1.5 text-sm text-white" onClick={() => void saveStrengths()}>Save</button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <ul className="flex-1 space-y-1">
+                    {(ma.strengths ?? []).map((s, i) => (
+                      <li key={i} className="flex items-start gap-1.5 text-sm text-garena-dark/90">
+                        <span className="mt-1 shrink-0 text-xs">•</span>
+                        <span>{s}</span>
+                      </li>
+                    ))}
+                    {!(ma.strengths?.length) && forumUser?.role === "admin" && (
+                      <li className="text-sm italic text-garena-dark/40">No strengths added yet.</li>
+                    )}
+                  </ul>
+                  {forumUser?.role === "admin" && (
+                    <div className="mt-3 flex justify-end">
+                      <button type="button" className="text-sm font-medium text-garena-red hover:underline" onClick={() => { setStrengthsDraft((ma.strengths ?? []).join("\n")); setEditingStrengths(true); }}>Edit</button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Box 3 — Areas for Development (leadership only) */}
+          {canViewLeadership && (
+            <div className="flex flex-col rounded-xl border border-red-100 bg-red-50 p-4">
+              <p className="mb-1.5 text-sm font-semibold text-garena-dark">Areas for Development</p>
+              {editingAreas ? (
+                <>
+                  <textarea
+                    className="min-h-[120px] w-full flex-1 rounded-md border border-red-200 bg-white p-2 text-sm text-garena-dark"
+                    placeholder="One area per line…"
+                    value={areasDraft}
+                    onChange={(e) => setAreasDraft(e.target.value)}
+                  />
+                  <div className="mt-2 flex justify-end gap-2">
+                    <button type="button" className="rounded-md border border-black/10 bg-white px-3 py-1.5 text-sm" onClick={() => setEditingAreas(false)}>Cancel</button>
+                    <button type="button" className="rounded-md bg-garena-red px-3 py-1.5 text-sm text-white" onClick={() => void saveAreas()}>Save</button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <ul className="flex-1 space-y-1">
+                    {(ma.areasForDevelopment ?? []).map((a, i) => (
+                      <li key={i} className="flex items-start gap-1.5 text-sm text-garena-dark/90">
+                        <span className="mt-1 shrink-0 text-xs">•</span>
+                        <span>{a}</span>
+                      </li>
+                    ))}
+                    {!(ma.areasForDevelopment?.length) && forumUser?.role === "admin" && (
+                      <li className="text-sm italic text-garena-dark/40">No areas added yet.</li>
+                    )}
+                  </ul>
+                  {forumUser?.role === "admin" && (
+                    <div className="mt-3 flex justify-end">
+                      <button type="button" className="text-sm font-medium text-garena-red hover:underline" onClick={() => { setAreasDraft((ma.areasForDevelopment ?? []).join("\n")); setEditingAreas(true); }}>Edit</button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
-      </div>
+      )}
 
       {ma.isPresenting !== false && (
         <>

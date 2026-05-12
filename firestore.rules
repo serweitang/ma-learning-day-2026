@@ -9,6 +9,13 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
+    // Helper: is the requesting user a leadership viewer?
+    function isLeadership() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'leadership';
+    }
+
     // ── userInvites ──────────────────────────────────────────────────────────────
     // Any authenticated user can read (needed for the client-side allowlist check).
     // Only admins can write — invites are managed via the admin panel.

@@ -64,7 +64,11 @@ function normaliseMa(id: string, data: ReturnType<typeof Object.create>): MA {
     order: data.order ?? null,
     isPresenting: data.isPresenting ?? null,
     school: data.school ?? null,
-    rotations: Array.isArray(data.rotations) ? data.rotations : [],
+    rotations: Array.isArray(data.rotations)
+      ? data.rotations.map((r: Rotation) => ({ ...r, performanceGrade: r.performanceGrade ?? null }))
+      : [],
+    strengths: Array.isArray(data.strengths) ? data.strengths : null,
+    areasForDevelopment: Array.isArray(data.areasForDevelopment) ? data.areasForDevelopment : null,
   };
 }
 
@@ -98,10 +102,16 @@ export async function updateMaBio(maId: string, bio: string): Promise<void> {
   );
 }
 
-/** Admin-only: update joinYear, school, and rotations on an MA profile. */
+/** Admin-only: update joinYear, school, rotations, strengths, and areasForDevelopment on an MA profile. */
 export async function updateMaProfile(
   maId: string,
-  data: { joinYear: number | null; school: string | null; rotations: Rotation[] }
+  data: {
+    joinYear: number | null;
+    school: string | null;
+    rotations: Rotation[];
+    strengths: string[] | null;
+    areasForDevelopment: string[] | null;
+  }
 ): Promise<void> {
   await setDoc(
     doc(db, "mas", maId),
@@ -109,6 +119,24 @@ export async function updateMaProfile(
       joinYear: data.joinYear,
       school: data.school,
       rotations: data.rotations,
+      strengths: data.strengths,
+      areasForDevelopment: data.areasForDevelopment,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+}
+
+/** Admin-only: update only the leadership-visible fields (strengths, areasForDevelopment). */
+export async function updateMaLeadershipData(
+  maId: string,
+  data: { strengths: string[] | null; areasForDevelopment: string[] | null }
+): Promise<void> {
+  await setDoc(
+    doc(db, "mas", maId),
+    {
+      strengths: data.strengths,
+      areasForDevelopment: data.areasForDevelopment,
       updatedAt: serverTimestamp(),
     },
     { merge: true }

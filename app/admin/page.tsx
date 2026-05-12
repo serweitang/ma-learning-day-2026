@@ -3,8 +3,53 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AdminGuard } from "@/components/AdminGuard";
 import { useAuth } from "@/components/AuthProvider";
-import { createMa, createUser, deleteMa, getUserByEmail, listMas, listUsers, updateMaBulk, updateMaProfile, updateUserRole } from "@/lib/firestore";
+import { createMa, createUser, deleteMa, getUserByEmail, listMas, listUsers, updateMaBulk, updateMaProfile, updateMaLeadershipData, updateUserRole } from "@/lib/firestore";
 import type { ForumUser, MA, Rotation, RotationLabel, UserRole } from "@/types";
+
+// ── Leadership seed data ─────────────────────────────────────────────────────
+
+const LEADERSHIP_SEED: Record<string, { strengths: string[]; areasForDevelopment: string[] }> = {
+  "xia zhiyu (iris)": {
+    strengths: ["Strong learning agility; quickly grasps workflows and collaboration norms", "Sharp logical thinking in analyzing root causes of issues", "Works independently with sound business judgment"],
+    areasForDevelopment: ["Build process-oriented thinking and stronger review skills to turn insights into actionable improvements", "More direct communication and greater attention to detail under heavy workload", "More confidence when expressing differing viewpoints"],
+  },
+  "liu shujian (harry)": {
+    strengths: ["Passionate gamer with strong product sense and deep game knowledge", "Receptive to feedback and improves quickly", "Early potential in game design, delivering above-junior-level output"],
+    areasForDevelopment: ["Stronger project management discipline — faster initial pace and earlier risk escalation", "Build confidence managing external agencies with clearer briefs and more direct communication"],
+  },
+  "jin yingjie (joyce)": {
+    strengths: ["Strong curiosity and proactive learning orientation; volunteers beyond core scope", "Quick to pick up new concepts, aided by UR and Dev background", "Delivers projects on time across varied workstreams"],
+    areasForDevelopment: ["Stronger ownership and accountability, particularly when direction is ambiguous", "Resource discipline — make clear trade-offs and not let constraints become a blocker to impact"],
+  },
+  "yan wei": {
+    strengths: ["Strong product thinking; insights directly contributed to hitting the 10k CCU milestone", "Adaptable and intellectually open; fast ramp-up across entirely unfamiliar platforms", "Engages fully across product analysis, user research, and advertising"],
+    areasForDevelopment: ["Sharpen execution discipline and time management; ensure initiatives are carried through to completion", "Narrow the gap between exploration and output — translate learnings into execution more quickly"],
+  },
+  "zhuang yuan (mitty)": {
+    strengths: ["Strong curiosity and exploratory drive; proactively goes beyond assigned scope", "Builds connections with local stakeholders and shows strong hands-on initiative", "Exceptional learning agility and cross-domain adaptability; quickly acquires and applies new skills"],
+    areasForDevelopment: ["Greater decisiveness and willingness to take calculated risks in ambiguous situations", "More confidence sharing original perspectives proactively, even when not fully formed"],
+  },
+  "joan chin": {
+    strengths: ["Strong sense of responsibility and genuine enthusiasm; actively explores beyond core expertise", "Positive attitude and strong resilience", "Receptive to feedback and consistently follows through on areas flagged for improvement"],
+    areasForDevelopment: ["Sharpen problem-solving and task decomposition skills to improve efficiency", "Build a more independent judgment system — form clearer conclusions, ask sharper questions, arrive at more decisive solutions"],
+  },
+  "xu zhanxiao": {
+    strengths: ["Strong cross-domain learning agility paired with genuine humility and a grounded mindset", "Sharp gaming instincts with clear, original thinking and well-structured logic"],
+    areasForDevelopment: ["Limited gaming industry experience — understanding of day-to-day game development and operations still surface-level"],
+  },
+  "shang ruting": {
+    strengths: ["Strong academic foundation in mathematics and business analytics; thinks rigorously and communicates clearly", "Deep passion for gaming with hands-on FPS experience, giving her a credible player perspective"],
+    areasForDevelopment: ["Tends toward individual contributor profile — leadership potential has not yet been demonstrated and warrants further assessment"],
+  },
+  "joshua lim": {
+    strengths: ["Extremely hardcore gamer with deep competitive knowledge translating into strong product instincts", "Sharp, structured thinker who cuts to root causes, contributes original ideas, and challenges others calmly"],
+    areasForDevelopment: ["Develop greater conviction in advocating for his views in the moment — learn to push for well-reasoned perspectives within discussions"],
+  },
+  "chen haolin": {
+    strengths: ["Analytically strong with sharp business acumen; breaks down complex problems systematically", "Translates deep player experience into grounded recommendations", "Confident and self-assured; open to challenge and quick to extend thinking when presented with new perspectives"],
+    areasForDevelopment: ["Leadership presence and ability to inspire others remain untested — worth probing in future rotations"],
+  },
+};
 
 // ── CSV helpers ──────────────────────────────────────────────────────────────
 
@@ -73,7 +118,7 @@ function parseUserCsv(text: string): UserCsvRow[] {
     const name = cols[nameIdx]?.trim() ?? "";
     const email = cols[emailIdx]?.trim().toLowerCase() ?? "";
     const rawRole = cols[roleIdx]?.trim().toLowerCase() ?? "viewer";
-    const role: UserRole = ["admin", "ma", "viewer"].includes(rawRole) ? (rawRole as UserRole) : "viewer";
+    const role: UserRole = ["admin", "ma", "viewer", "leadership"].includes(rawRole) ? (rawRole as UserRole) : "viewer";
 
     let error: string | null = null;
     if (!name) error = "Missing name";
@@ -135,6 +180,11 @@ function AdminPanel() {
   const [csvResult, setCsvResult] = useState<string | null>(null);
   const [csvError, setCsvError] = useState<string | null>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
+
+  // Seed leadership data
+  const [seedBusy, setSeedBusy] = useState(false);
+  const [seedResult, setSeedResult] = useState<string | null>(null);
+  const [seedError, setSeedError] = useState<string | null>(null);
 
   const load = async () => {
     setError(null);
@@ -352,6 +402,35 @@ function AdminPanel() {
     }
   };
 
+  const onSeedLeadership = async () => {
+    setSeedBusy(true);
+    setSeedResult(null);
+    setSeedError(null);
+    try {
+      const currentMas = await listMas();
+      const matched: string[] = [];
+      await Promise.all(
+        currentMas.map(async (m) => {
+          const key = m.name.trim().toLowerCase();
+          const data = LEADERSHIP_SEED[key];
+          if (data) {
+            await updateMaLeadershipData(m.id, {
+              strengths: data.strengths,
+              areasForDevelopment: data.areasForDevelopment,
+            });
+            matched.push(m.name);
+          }
+        })
+      );
+      setSeedResult(`Updated ${matched.length} profile(s): ${matched.join(", ") || "none"}`);
+      await load();
+    } catch (err) {
+      setSeedError(err instanceof Error ? err.message : "Seed failed");
+    } finally {
+      setSeedBusy(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center text-garena-dark/60">Loading…</div>
@@ -365,6 +444,26 @@ function AdminPanel() {
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>
       )}
+
+      {/* ── Seed leadership data ── */}
+      <section className="mt-6 rounded-xl border border-black/10 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-garena-dark">Seed leadership data</h2>
+            <p className="mt-0.5 text-xs text-garena-dark/55">Populates Strengths &amp; Areas for Development for all 10 MAs from the pre-loaded dataset. Safe to run multiple times.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void onSeedLeadership()}
+            disabled={seedBusy}
+            className="rounded-md bg-garena-dark px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {seedBusy ? "Seeding…" : "Seed now"}
+          </button>
+        </div>
+        {seedError && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{seedError}</p>}
+        {seedResult && <p className="mt-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">{seedResult}</p>}
+      </section>
 
       {/* ── Add MA Profile ── */}
       <section className="mt-10 rounded-xl border border-black/10 bg-white p-6 shadow-sm">
@@ -596,6 +695,7 @@ function AdminPanel() {
             >
               <option value="viewer">viewer</option>
               <option value="ma">ma</option>
+              <option value="leadership">leadership</option>
               <option value="admin">admin</option>
             </select>
           </label>
@@ -637,7 +737,7 @@ function AdminPanel() {
         <p className="mt-1 text-xs text-garena-dark/55">
           Expected columns: <code className="rounded bg-black/5 px-1">Name</code>,{" "}
           <code className="rounded bg-black/5 px-1">Email</code>,{" "}
-          <code className="rounded bg-black/5 px-1">Role</code> (viewer / ma / admin).
+          <code className="rounded bg-black/5 px-1">Role</code> (viewer / ma / leadership / admin).
         </p>
 
         {userCsvError && (
@@ -774,7 +874,7 @@ function isValidUrl(url: string): boolean {
 const ROTATION_LABELS: RotationLabel[] = ["R1", "R2", "R3", "R4"];
 
 function emptyRotation(label: RotationLabel): Rotation {
-  return { label, department: "", learningMemoUrl: null, presentationUrl: null };
+  return { label, department: "", learningMemoUrl: null, presentationUrl: null, performanceGrade: null };
 }
 
 function MATableRow({
@@ -802,6 +902,8 @@ function MATableRow({
   const [rotations, setRotations] = useState<Rotation[]>(
     m.rotations.length > 0 ? m.rotations : []
   );
+  const [strengthsDraft, setStrengthsDraft] = useState<string>((m.strengths ?? []).join("\n"));
+  const [areasDraft, setAreasDraft] = useState<string>((m.areasForDevelopment ?? []).join("\n"));
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -811,7 +913,9 @@ function MATableRow({
     setJoinYear(m.joinYear?.toString() ?? "");
     setSchool(m.school ?? "");
     setRotations(m.rotations.length > 0 ? m.rotations : []);
-  }, [m.joinYear, m.school, m.rotations]);
+    setStrengthsDraft((m.strengths ?? []).join("\n"));
+    setAreasDraft((m.areasForDevelopment ?? []).join("\n"));
+  }, [m.joinYear, m.school, m.rotations, m.strengths, m.areasForDevelopment]);
 
   const addRotation = () => {
     const usedLabels = new Set(rotations.map((r) => r.label));
@@ -855,6 +959,8 @@ function MATableRow({
         joinYear: isNaN(parsedYear) ? null : parsedYear,
         school: school.trim() || null,
         rotations,
+        strengths: strengthsDraft.split("\n").map((s) => s.trim()).filter(Boolean),
+        areasForDevelopment: areasDraft.split("\n").map((s) => s.trim()).filter(Boolean),
       });
       setSaveSuccess(true);
       await onProfileSaved();
@@ -987,13 +1093,22 @@ function MATableRow({
                         </button>
                       </div>
                       <div className="space-y-2">
-                        <input
-                          className="w-full rounded-md border border-black/15 px-2 py-1.5 text-sm"
-                          type="text"
-                          placeholder="Department name"
-                          value={r.department}
-                          onChange={(e) => updateRotation(idx, { department: e.target.value })}
-                        />
+                        <div className="flex gap-2">
+                          <input
+                            className="min-w-0 flex-1 rounded-md border border-black/15 px-2 py-1.5 text-sm"
+                            type="text"
+                            placeholder="Department name"
+                            value={r.department}
+                            onChange={(e) => updateRotation(idx, { department: e.target.value })}
+                          />
+                          <input
+                            className="w-28 shrink-0 rounded-md border border-black/15 px-2 py-1.5 text-sm"
+                            type="text"
+                            placeholder="Grade"
+                            value={r.performanceGrade ?? ""}
+                            onChange={(e) => updateRotation(idx, { performanceGrade: e.target.value || null })}
+                          />
+                        </div>
                         <input
                           className="w-full rounded-md border border-black/15 px-2 py-1.5 text-sm"
                           type="url"
@@ -1021,6 +1136,31 @@ function MATableRow({
                     + Add rotation
                   </button>
                 )}
+              </div>
+
+              {/* Strengths & Areas for Development (leadership-only fields) */}
+              <div>
+                <p className="mb-2 text-xs font-medium text-garena-dark">Strengths &amp; Areas for Development <span className="font-normal text-garena-dark/50">(leadership-visible only)</span></p>
+                <div className="space-y-3">
+                  <label className="flex flex-col text-xs font-medium text-garena-dark">
+                    Strengths — one per line
+                    <textarea
+                      className="mt-1 min-h-[80px] rounded-md border border-black/15 px-2 py-1.5 text-sm font-normal"
+                      placeholder={"Strong learning agility…\nSharp logical thinking…"}
+                      value={strengthsDraft}
+                      onChange={(e) => setStrengthsDraft(e.target.value)}
+                    />
+                  </label>
+                  <label className="flex flex-col text-xs font-medium text-garena-dark">
+                    Areas for Development — one per line
+                    <textarea
+                      className="mt-1 min-h-[80px] rounded-md border border-black/15 px-2 py-1.5 text-sm font-normal"
+                      placeholder={"Build process-oriented thinking…\nMore direct communication…"}
+                      value={areasDraft}
+                      onChange={(e) => setAreasDraft(e.target.value)}
+                    />
+                  </label>
+                </div>
               </div>
 
               <button
@@ -1094,6 +1234,7 @@ function UserRow({
         >
           <option value="viewer">viewer</option>
           <option value="ma">ma</option>
+          <option value="leadership">leadership</option>
           <option value="admin">admin</option>
         </select>
       </td>

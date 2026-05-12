@@ -21,6 +21,8 @@ export const PLACEHOLDER_MAS: MA[] = [
     isPresenting: null,
     school: null,
     rotations: [],
+    strengths: null,
+    areasForDevelopment: null,
   },
   {
     id: "ma-02",
@@ -37,6 +39,8 @@ export const PLACEHOLDER_MAS: MA[] = [
     isPresenting: null,
     school: null,
     rotations: [],
+    strengths: null,
+    areasForDevelopment: null,
   },
   {
     id: "ma-03",
@@ -53,6 +57,8 @@ export const PLACEHOLDER_MAS: MA[] = [
     isPresenting: null,
     school: null,
     rotations: [],
+    strengths: null,
+    areasForDevelopment: null,
   },
   {
     id: "ma-04",
@@ -69,6 +75,8 @@ export const PLACEHOLDER_MAS: MA[] = [
     isPresenting: null,
     school: null,
     rotations: [],
+    strengths: null,
+    areasForDevelopment: null,
   },
   {
     id: "ma-05",
@@ -85,6 +93,8 @@ export const PLACEHOLDER_MAS: MA[] = [
     isPresenting: null,
     school: null,
     rotations: [],
+    strengths: null,
+    areasForDevelopment: null,
   },
   {
     id: "ma-06",
@@ -101,6 +111,8 @@ export const PLACEHOLDER_MAS: MA[] = [
     isPresenting: null,
     school: null,
     rotations: [],
+    strengths: null,
+    areasForDevelopment: null,
   },
   {
     id: "ma-07",
@@ -117,6 +129,8 @@ export const PLACEHOLDER_MAS: MA[] = [
     isPresenting: null,
     school: null,
     rotations: [],
+    strengths: null,
+    areasForDevelopment: null,
   },
   {
     id: "ma-08",
@@ -133,6 +147,8 @@ export const PLACEHOLDER_MAS: MA[] = [
     isPresenting: null,
     school: null,
     rotations: [],
+    strengths: null,
+    areasForDevelopment: null,
   },
   {
     id: "ma-09",
@@ -149,6 +165,8 @@ export const PLACEHOLDER_MAS: MA[] = [
     isPresenting: null,
     school: null,
     rotations: [],
+    strengths: null,
+    areasForDevelopment: null,
   },
   {
     id: "ma-10",
@@ -165,6 +183,8 @@ export const PLACEHOLDER_MAS: MA[] = [
     isPresenting: null,
     school: null,
     rotations: [],
+    strengths: null,
+    areasForDevelopment: null,
   },
 ];
 

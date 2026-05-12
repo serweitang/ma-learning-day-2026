@@ -1,6 +1,6 @@
 import type { Timestamp } from "firebase/firestore";
 
-export type UserRole = "admin" | "ma" | "viewer";
+export type UserRole = "admin" | "ma" | "viewer" | "leadership";
 
 export type ReactionType = "like" | "heart" | "insightful" | "confused";
 
@@ -23,6 +23,7 @@ export interface Rotation {
   department: string;
   learningMemoUrl: string | null;
   presentationUrl: string | null;
+  performanceGrade: string | null;
 }
 
 /** Firestore `mas` collection document */
@@ -41,6 +42,8 @@ export interface MA {
   isPresenting: boolean | null;
   school: string | null;
   rotations: Rotation[];
+  strengths: string[] | null;
+  areasForDevelopment: string[] | null;
 }
 
 /** Firestore `comments` collection document */
