@@ -76,6 +76,12 @@ export function CommentBox({ comment }: Props) {
             )}
           </div>
 
+          {comment.quote && (
+            <blockquote className="mt-2 rounded-sm border-l-4 border-garena-red/40 bg-garena-red/5 px-3 py-1.5 text-sm italic text-garena-dark/60">
+              &ldquo;{comment.quote}&rdquo;
+            </blockquote>
+          )}
+
           {editing ? (
             <div className="mt-3 space-y-2">
               <RichTextEditor valueHtml={html} onChangeHtml={setHtml} maxChars={MAX_CHARS} />

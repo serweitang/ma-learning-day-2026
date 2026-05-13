@@ -27,8 +27,12 @@ import { useAuth } from "@/components/AuthProvider";
 import { canUploadMemo, canEditMaProfile, canViewLeadershipData } from "@/lib/auth";
 import { getMa, setMaMemoUploaded, updateMaBio, updateMaLeadershipData } from "@/lib/firestore";
 import { formatSgt } from "@/lib/datetime";
+import dynamic from "next/dynamic";
 import type { MA } from "@/types";
-import { PDFViewer } from "@/components/PDFViewer";
+const PDFViewer = dynamic(
+  () => import("@/components/PDFViewer").then((m) => m.PDFViewer),
+  { ssr: false, loading: () => <div className="flex h-48 items-center justify-center text-sm text-garena-dark/40">Loading PDF…</div> }
+);
 import { ReactionBar } from "@/components/ReactionBar";
 import { CommentSection } from "@/components/CommentSection";
 import { HorseIcon } from "@/components/HorseIcon";
@@ -48,6 +52,7 @@ export function MAProfile({ initial }: Props) {
   const [areasDraft, setAreasDraft] = useState((initial.areasForDevelopment ?? []).join("\n"));
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingQuote, setPendingQuote] = useState<string | null>(null);
 
   const canEdit = useMemo(
     () => (forumUser ? canEditMaProfile(forumUser, ma.id) : false),
@@ -413,7 +418,7 @@ export function MAProfile({ initial }: Props) {
                   Rotation Memo — {currentRotationDept}
                 </h2>
               )}
-              <PDFViewer url={ma.memoURL} title={`${ma.name} memo`} />
+              <PDFViewer url={ma.memoURL} title={`${ma.name} memo`} onQuote={setPendingQuote} />
               {memoTime && (
                 <p className="text-xs text-garena-dark/50">
                   Last updated: {memoTime} SGT
@@ -435,6 +440,8 @@ export function MAProfile({ initial }: Props) {
       <CommentSection
         maId={ma.id}
         horseId={COMMENT_HORSE_MAS.includes(nameKey(ma.name)) ? `horse_ma_${ma.id}` : undefined}
+        pendingQuote={pendingQuote}
+        onQuoteClear={() => setPendingQuote(null)}
       />
 
       {!firebaseUser && (

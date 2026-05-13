@@ -183,9 +183,15 @@ export async function addComment(input: {
   authorName: string;
   authorPhoto: string;
   content: string;
+  quote?: string | null;
 }): Promise<void> {
   await addDoc(collection(db, "comments"), {
-    ...input,
+    maId: input.maId,
+    authorUid: input.authorUid,
+    authorName: input.authorName,
+    authorPhoto: input.authorPhoto,
+    content: input.content,
+    quote: input.quote ?? null,
     createdAt: serverTimestamp(),
     editedAt: null,
     isEdited: false,

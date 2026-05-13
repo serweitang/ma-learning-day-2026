@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "prebuild": "node -e \"require('fs').copyFileSync('node_modules/pdfjs-dist/build/pdf.worker.min.js','public/pdf.worker.min.mjs')\"",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
@@ -15,7 +16,8 @@
     "firebase-admin": "^13.7.0",
     "next": "14.2.35",
     "react": "^18",
-    "react-dom": "^18"
+    "react-dom": "^18",
+    "react-pdf": "^7.7.3"
   },
   "devDependencies": {
     "@types/canvas-confetti": "^1.9.0",

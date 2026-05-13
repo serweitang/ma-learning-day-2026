@@ -82,7 +82,7 @@ export async function getLeaderboard(): Promise<LeaderboardEntry[]> {
         lastFoundAt: data.lastFoundAt?.toDate?.() ?? null,
       };
     });
-  } catch (e) {
+  } catch {
     // Index still building — fetch without ordering and sort client-side
     const snap = await getDocs(collection(db, "horseGame"));
     const entries = snap.docs.map((d) => {
