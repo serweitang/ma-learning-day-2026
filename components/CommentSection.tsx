@@ -32,6 +32,7 @@ export function CommentSection({ maId, horseId, pendingQuote, onQuoteClear }: Pr
   const [draft, setDraft] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pendingReply, setPendingReply] = useState<{ commentId: string; name: string } | null>(null);
   const formRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -43,12 +44,16 @@ export function CommentSection({ maId, horseId, pendingQuote, onQuoteClear }: Pr
     return () => unsub();
   }, [maId]);
 
-  // Scroll to the comment form when a quote arrives
+  // Scroll to comment form when a quote or reply is triggered
   useEffect(() => {
-    if (pendingQuote) {
+    if (pendingQuote || pendingReply) {
       formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }
-  }, [pendingQuote]);
+  }, [pendingQuote, pendingReply]);
+
+  const onReply = (commentId: string, name: string) => {
+    setPendingReply({ commentId, name });
+  };
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,9 +70,12 @@ export function CommentSection({ maId, horseId, pendingQuote, onQuoteClear }: Pr
         authorPhoto: firebaseUser.photoURL ?? "",
         content: draft,
         quote: pendingQuote ?? null,
+        replyToCommentId: pendingReply?.commentId ?? null,
+        replyToName: pendingReply?.name ?? null,
       });
       setDraft("");
       onQuoteClear?.();
+      setPendingReply(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to post comment");
     } finally {
@@ -87,6 +95,21 @@ export function CommentSection({ maId, horseId, pendingQuote, onQuoteClear }: Pr
       {firebaseUser ? (
         <div ref={formRef}>
           <form onSubmit={(e) => void onSubmit(e)} className="space-y-3 rounded-lg border border-black/10 bg-garena-bg p-4">
+            {pendingReply && (
+              <div className="flex items-center justify-between gap-2 rounded-md bg-white px-3 py-2 text-sm">
+                <span className="text-garena-dark/60">
+                  ↩ Replying to <span className="font-semibold text-garena-dark">{pendingReply.name}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPendingReply(null)}
+                  className="shrink-0 text-xs text-garena-dark/40 hover:text-garena-dark"
+                  aria-label="Cancel reply"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
             {pendingQuote && (
               <div className="flex items-start gap-2 rounded-md border-l-4 border-garena-red/50 bg-white px-3 py-2">
                 <blockquote className="min-w-0 flex-1 line-clamp-3 text-sm italic text-garena-dark/60">
@@ -107,7 +130,7 @@ export function CommentSection({ maId, horseId, pendingQuote, onQuoteClear }: Pr
               onChangeHtml={setDraft}
               maxChars={MAX_CHARS}
               disabled={submitting}
-              placeholder={pendingQuote ? "Add your comment on this quote…" : "Share your thoughts…"}
+              placeholder={pendingReply ? `Reply to ${pendingReply.name}…` : pendingQuote ? "Add your comment on this quote…" : "Share your thoughts…"}
             />
             <div className="flex items-center gap-2">
               <button
@@ -126,12 +149,44 @@ export function CommentSection({ maId, horseId, pendingQuote, onQuoteClear }: Pr
       )}
 
       <div className="space-y-3">
-        {comments.map((c) => (
-          <CommentBox key={c.id} comment={c} />
-        ))}
-        {comments.length === 0 && (
-          <p className="text-sm text-garena-dark/50">No comments yet — start the discussion.</p>
-        )}
+        {(() => {
+          if (comments.length === 0) {
+            return <p className="text-sm text-garena-dark/50">No comments yet — start the discussion.</p>;
+          }
+
+          // Build a lookup map and walk up to find the root of any reply chain
+          const byId = new Map(comments.map((c) => [c.id, c]));
+          const threadRoot = (c: Comment): string => {
+            if (!c.replyToCommentId) return c.id;
+            const parent = byId.get(c.replyToCommentId);
+            return parent ? threadRoot(parent) : c.id;
+          };
+
+          const topLevel = comments.filter((c) => !c.replyToCommentId);
+
+          // Group all non-top-level comments under their root
+          const threadReplies = new Map<string, Comment[]>();
+          for (const c of comments) {
+            if (!c.replyToCommentId) continue;
+            const rootId = threadRoot(c);
+            const bucket = threadReplies.get(rootId) ?? [];
+            bucket.push(c);
+            threadReplies.set(rootId, bucket);
+          }
+
+          return topLevel.map((c) => (
+            <div key={c.id} className="space-y-2">
+              <CommentBox comment={c} onReply={firebaseUser ? onReply : undefined} />
+              {(threadReplies.get(c.id) ?? []).map((r) => {
+                const parent = r.replyToCommentId ? byId.get(r.replyToCommentId) : null;
+                const resolvedName = parent?.authorName ?? r.replyToName ?? null;
+                return (
+                  <CommentBox key={r.id} comment={r} onReply={firebaseUser ? onReply : undefined} isReply replyToDisplayName={resolvedName} />
+                );
+              })}
+            </div>
+          ));
+        })()}
       </div>
     </section>
   );

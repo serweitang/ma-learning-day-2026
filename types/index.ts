@@ -55,6 +55,8 @@ export interface Comment {
   authorPhoto: string;
   content: string;
   quote?: string | null;
+  replyToCommentId?: string | null;
+  replyToName?: string | null;
   createdAt: Timestamp;
   editedAt: Timestamp | null;
   isEdited: boolean;

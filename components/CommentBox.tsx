@@ -12,9 +12,12 @@ const MAX_CHARS = 1000;
 
 type Props = {
   comment: Comment;
+  onReply?: (commentId: string, authorName: string) => void;
+  isReply?: boolean;
+  replyToDisplayName?: string | null;
 };
 
-export function CommentBox({ comment }: Props) {
+export function CommentBox({ comment, onReply, isReply = false, replyToDisplayName }: Props) {
   const { firebaseUser, forumUser } = useAuth();
   const [editing, setEditing] = useState(false);
   const [html, setHtml] = useState(comment.content);
@@ -48,7 +51,7 @@ export function CommentBox({ comment }: Props) {
   };
 
   return (
-    <article className="rounded-lg border border-black/10 bg-white p-4 shadow-sm">
+    <article className={`rounded-lg border border-black/10 bg-white p-4 shadow-sm${isReply ? " ml-8 border-l-4 border-l-garena-red/20" : ""}`}>
       <div className="flex items-start gap-3">
         {comment.authorPhoto ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -64,6 +67,12 @@ export function CommentBox({ comment }: Props) {
           </span>
         )}
         <div className="min-w-0 flex-1">
+          {(replyToDisplayName ?? comment.replyToName) && (
+            <p className="mb-1 text-xs text-garena-dark/50">
+              ↩ Replying to <span className="font-medium text-garena-dark/70">{replyToDisplayName ?? comment.replyToName}</span>
+            </p>
+          )}
+
           <div className="flex flex-wrap items-baseline gap-2">
             <span className="font-semibold text-garena-dark">{comment.authorName}</span>
             <time className="text-xs text-garena-dark/50" dateTime={created}>
@@ -115,16 +124,27 @@ export function CommentBox({ comment }: Props) {
             />
           )}
 
-          {canMod && !editing && (
-            <div className="mt-3 flex gap-2 text-xs">
+          {!editing && (
+            <div className="mt-3 flex gap-3 text-xs">
+              {onReply && (
+                <button
+                  type="button"
+                  className="text-garena-dark/50 hover:text-garena-red"
+                  onClick={() => onReply(comment.id, comment.authorName)}
+                >
+                  ↩ Reply
+                </button>
+              )}
               {canEdit && (
-                <button type="button" className="text-garena-red hover:underline" onClick={() => setEditing(true)}>
+                <button type="button" className="text-garena-dark/50 hover:text-garena-red" onClick={() => setEditing(true)}>
                   Edit
                 </button>
               )}
-              <button type="button" className="text-garena-red hover:underline" onClick={() => void onDelete()}>
-                Delete
-              </button>
+              {canMod && (
+                <button type="button" className="text-garena-dark/50 hover:text-garena-red" onClick={() => void onDelete()}>
+                  Delete
+                </button>
+              )}
             </div>
           )}
         </div>
