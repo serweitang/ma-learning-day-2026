@@ -115,6 +115,29 @@ export function PDFViewer({ url, title = "MA memo", onQuote }: Props) {
         </Document>
       </div>
 
+      {/* bottom page navigation — only shown when there are multiple pages */}
+      {numPages !== null && numPages > 1 && (
+        <div className="flex items-center justify-between border-t border-black/10 bg-white px-4 py-2 select-none">
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page <= 1}
+            className="rounded-md border border-black/10 px-3 py-1.5 text-sm text-garena-dark hover:bg-garena-bg disabled:invisible"
+          >
+            ← Prev
+          </button>
+          <span className="text-xs text-garena-dark/50">{page} / {numPages}</span>
+          <button
+            type="button"
+            onClick={() => setPage((p) => Math.min(numPages, p + 1))}
+            disabled={page >= numPages}
+            className="rounded-md bg-garena-red px-3 py-1.5 text-sm font-medium text-white hover:bg-garena-red/90 disabled:invisible"
+          >
+            Next page →
+          </button>
+        </div>
+      )}
+
       {/* floating quote button — fixed to viewport so scroll doesn't affect it */}
       {selection && onQuote && (
         <button
