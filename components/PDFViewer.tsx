@@ -14,7 +14,7 @@ export function PDFViewer({ url, title = "MA memo" }: Props) {
     <div className="overflow-hidden rounded-lg border border-black/10 bg-garena-white shadow-inner">
       <iframe
         title={title}
-        src={url}
+        src={`${url}#navpanes=0`}
         className="h-[min(70vh,720px)] w-full bg-garena-bg"
       />
     </div>
