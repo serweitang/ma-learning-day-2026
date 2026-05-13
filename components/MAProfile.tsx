@@ -63,6 +63,14 @@ export function MAProfile({ initial }: Props) {
     () => canViewLeadershipData(forumUser),
     [forumUser]
   );
+
+  const viewBadge = forumUser
+    ? forumUser.role === "admin"
+      ? { label: "Admin View", cls: "border-red-200 bg-red-50 text-garena-red" }
+      : forumUser.role === "leadership"
+      ? { label: "Leadership View", cls: "border-amber-200 bg-amber-50 text-amber-700" }
+      : { label: "Participant View", cls: "border-black/10 bg-garena-bg text-garena-dark/40" }
+    : null;
   const staticPhotoPath = `/ma-photos/${ma.name.toLowerCase().replace(/\s+/g, "-")}.jpg`;
 
   function resolvePhotoUrl(url: string): string {
@@ -163,7 +171,17 @@ export function MAProfile({ initial }: Props) {
       : null;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-8 px-4 py-8 sm:px-6">
+    <div className="relative mx-auto max-w-4xl space-y-8 px-4 py-8 sm:px-6">
+      {viewBadge && (
+        <div className={`absolute right-4 top-6 sm:right-6 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium ${viewBadge.cls}`}>
+          {viewBadge.label === "Leadership View" ? (
+            <svg className="h-3 w-3" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l2 4.5 5 .5-3.5 3.5 1 5L8 12l-4.5 2.5 1-5L1 6l5-.5z"/></svg>
+          ) : (
+            <svg className="h-3 w-3" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="6"/></svg>
+          )}
+          {viewBadge.label}
+        </div>
+      )}
       {error && (
         <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>
       )}
@@ -272,6 +290,13 @@ export function MAProfile({ initial }: Props) {
       </div>
 
       {(ma.rotations.length > 0 || canViewLeadership) && (
+        <div className="space-y-3">
+        {canViewLeadership && (
+          <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+            <svg className="mt-0.5 h-3.5 w-3.5 shrink-0" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1l2 4.5 5 .5-3.5 3.5 1 5L8 12l-4.5 2.5 1-5L1 6l5-.5z"/></svg>
+            <span><span className="font-semibold">Confidential</span> — Performance ratings, strengths and areas for development are confidential information visible to leadership and admin only.</span>
+          </div>
+        )}
         <div className={`grid w-full items-stretch gap-4 ${canViewLeadership ? "grid-cols-1 md:grid-cols-3" : "grid-cols-1"}`}>
           {/* Box 1 — Rotations */}
           {ma.rotations.length > 0 && (
@@ -390,6 +415,7 @@ export function MAProfile({ initial }: Props) {
               )}
             </div>
           )}
+        </div>
         </div>
       )}
 
