@@ -1,6 +1,7 @@
 "use client";
 
 import { onAuthStateChanged, signOut as firebaseSignOut, type User } from "firebase/auth";
+import { doc, onSnapshot } from "firebase/firestore";
 import { usePathname, useRouter } from "next/navigation";
 import {
   createContext,
@@ -8,10 +9,11 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react";
-import { auth } from "@/config/firebase";
-import { ensureUserDocument, getForumUser, isAllowedEmail } from "@/lib/auth";
+import { auth, db } from "@/config/firebase";
+import { ensureUserDocument, isAllowedEmail } from "@/lib/auth";
 import { checkAllowedUser } from "@/lib/firestore";
 import type { ForumUser } from "@/types";
 
@@ -34,6 +36,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAllowed, setIsAllowed] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Holds the unsubscribe fn for the live user-doc listener so we can tear it down on sign-out.
+  const userDocUnsubRef = useRef<(() => void) | null>(null);
+
   const refreshForumUser = useCallback(async () => {
     const u = auth.currentUser;
     if (!u) {
@@ -41,19 +46,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsAllowed(null);
       return;
     }
-    const docUser = await getForumUser(u.uid);
-    setForumUser(docUser);
-    // Admins are always allowed regardless of allowedUsers collection
-    if (docUser?.role === "admin") {
-      setIsAllowed(true);
-    } else {
-      const allowed = await checkAllowedUser(u.uid, u.email ?? "");
-      setIsAllowed(allowed);
-    }
+    // The live snapshot already keeps forumUser current; just re-check isAllowed.
+    const allowed = await checkAllowedUser(u.uid, u.email ?? "");
+    setIsAllowed(allowed);
   }, []);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
+      // Tear down any previous user-doc listener.
+      userDocUnsubRef.current?.();
+      userDocUnsubRef.current = null;
+
       setLoading(true);
 
       if (!user) {
@@ -76,21 +79,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setFirebaseUser(user);
       await ensureUserDocument(user);
-      const docUser = await getForumUser(user.uid);
-      setForumUser(docUser);
 
-      // Admins bypass the allowedUsers check
-      if (docUser?.role === "admin") {
-        setIsAllowed(true);
-      } else {
-        const allowed = await checkAllowedUser(user.uid, user.email ?? "");
-        setIsAllowed(allowed);
-      }
+      const allowed = await checkAllowedUser(user.uid, user.email ?? "");
+      setIsAllowed(allowed);
+
+      // Subscribe to the user doc so role changes made by admins propagate instantly.
+      userDocUnsubRef.current = onSnapshot(doc(db, "users", user.uid), (snap) => {
+        setForumUser(snap.exists() ? (snap.data() as ForumUser) : null);
+      });
 
       setLoading(false);
     });
 
-    return () => unsub();
+    return () => {
+      unsub();
+      userDocUnsubRef.current?.();
+    };
   }, [router]);
 
   useEffect(() => {
