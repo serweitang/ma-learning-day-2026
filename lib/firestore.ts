@@ -329,3 +329,16 @@ export async function checkAllowedUser(uid: string, email: string): Promise<bool
   const snap = await getDoc(doc(db, "userInvites", userEmailDocId(email)));
   return snap.exists();
 }
+
+export async function listUserInvites(): Promise<string[]> {
+  const snap = await getDocs(collection(db, "userInvites"));
+  return snap.docs.map((d) => (d.data().email as string | undefined)?.toLowerCase() ?? "").filter(Boolean);
+}
+
+export async function grantInvite(email: string): Promise<void> {
+  const norm = email.trim().toLowerCase();
+  await setDoc(doc(db, "userInvites", userEmailDocId(norm)), {
+    email: norm,
+    createdAt: serverTimestamp(),
+  });
+}

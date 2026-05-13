@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AdminGuard } from "@/components/AdminGuard";
 import { useAuth } from "@/components/AuthProvider";
-import { createMa, createUser, deleteMa, getUserByEmail, listMas, listUsers, updateMaBulk, updateMaProfile, updateMaLeadershipData, updateUserRole } from "@/lib/firestore";
+import { createMa, createUser, deleteMa, getUserByEmail, grantInvite, listMas, listUserInvites, listUsers, updateMaBulk, updateMaProfile, updateMaLeadershipData, updateUserRole } from "@/lib/firestore";
 import type { ForumUser, MA, Rotation, RotationLabel, UserRole } from "@/types";
 
 // ── Leadership seed data ─────────────────────────────────────────────────────
@@ -185,6 +185,13 @@ function AdminPanel() {
   const [seedBusy, setSeedBusy] = useState(false);
   const [seedResult, setSeedResult] = useState<string | null>(null);
   const [seedError, setSeedError] = useState<string | null>(null);
+
+  // Access check
+  const [checkBusy, setCheckBusy] = useState(false);
+  const [missingInvites, setMissingInvites] = useState<ForumUser[] | null>(null);
+  const [fixBusy, setFixBusy] = useState(false);
+  const [fixResult, setFixResult] = useState<string | null>(null);
+  const [checkError, setCheckError] = useState<string | null>(null);
 
   const load = async () => {
     setError(null);
@@ -431,6 +438,38 @@ function AdminPanel() {
     }
   };
 
+  const onCheckAccess = async () => {
+    setCheckBusy(true);
+    setCheckError(null);
+    setMissingInvites(null);
+    setFixResult(null);
+    try {
+      const [allUsers, invitedEmails] = await Promise.all([listUsers(), listUserInvites()]);
+      const inviteSet = new Set(invitedEmails);
+      const missing = allUsers.filter((u) => u.email && !inviteSet.has(u.email.toLowerCase()));
+      setMissingInvites(missing);
+    } catch (e) {
+      setCheckError(e instanceof Error ? e.message : "Check failed");
+    } finally {
+      setCheckBusy(false);
+    }
+  };
+
+  const onFixAll = async () => {
+    if (!missingInvites?.length) return;
+    setFixBusy(true);
+    setFixResult(null);
+    try {
+      await Promise.all(missingInvites.map((u) => grantInvite(u.email)));
+      setFixResult(`Granted access to ${missingInvites.length} user(s).`);
+      setMissingInvites([]);
+    } catch (e) {
+      setCheckError(e instanceof Error ? e.message : "Fix failed");
+    } finally {
+      setFixBusy(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex min-h-[40vh] items-center justify-center text-garena-dark/60">Loading…</div>
@@ -444,6 +483,65 @@ function AdminPanel() {
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{error}</p>
       )}
+
+      {/* ── Access check ── */}
+      <section className="mt-6 rounded-xl border border-black/10 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-garena-dark">Check user access</h2>
+            <p className="mt-0.5 text-xs text-garena-dark/55">Finds users in the system who are missing a <code className="rounded bg-black/5 px-1">userInvites</code> entry and cannot log in.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void onCheckAccess()}
+            disabled={checkBusy}
+            className="rounded-md bg-garena-dark px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {checkBusy ? "Checking…" : "Run check"}
+          </button>
+        </div>
+        {checkError && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{checkError}</p>}
+        {fixResult && <p className="mt-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">{fixResult}</p>}
+        {missingInvites !== null && (
+          <div className="mt-3">
+            {missingInvites.length === 0 ? (
+              <p className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">All users have access — no action needed.</p>
+            ) : (
+              <>
+                <p className="mb-2 text-sm font-medium text-red-700">{missingInvites.length} user(s) cannot log in (missing invite):</p>
+                <div className="overflow-x-auto rounded-md border border-black/10">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-garena-bg/80">
+                      <tr>
+                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-garena-dark/60">Name</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-garena-dark/60">Email</th>
+                        <th className="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-garena-dark/60">Role</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-black/5">
+                      {missingInvites.map((u) => (
+                        <tr key={u.uid ?? u.email}>
+                          <td className="px-3 py-2 font-medium text-garena-dark">{u.displayName || "—"}</td>
+                          <td className="px-3 py-2 text-garena-dark/70">{u.email}</td>
+                          <td className="px-3 py-2 text-garena-dark/70">{u.role}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void onFixAll()}
+                  disabled={fixBusy}
+                  className="mt-3 rounded-md bg-garena-red px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                >
+                  {fixBusy ? "Fixing…" : `Grant access to all ${missingInvites.length}`}
+                </button>
+              </>
+            )}
+          </div>
+        )}
+      </section>
 
       {/* ── Seed leadership data ── */}
       <section className="mt-6 rounded-xl border border-black/10 bg-white p-5 shadow-sm">
