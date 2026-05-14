@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AdminGuard } from "@/components/AdminGuard";
 import { useAuth } from "@/components/AuthProvider";
-import { createMa, createUser, deleteMa, getUserByEmail, grantInvite, listMas, listUserInvites, listUsers, updateMaBulk, updateMaProfile, updateMaLeadershipData, updateMaRotations, updateUserRole } from "@/lib/firestore";
-import type { ForumUser, MA, Rotation, RotationLabel, UserRole } from "@/types";
+import { createMa, createUser, deleteMa, getMaConfidential, getUserByEmail, grantInvite, listMas, listUserInvites, listUsers, updateMaBulk, updateMaProfile, updateMaLeadershipData, updateMaRotations, updateUserRole } from "@/lib/firestore";
+import type { ForumUser, MA, MAConfidential, Rotation, RotationLabel, UserRole } from "@/types";
 
 // ── Leadership seed data ─────────────────────────────────────────────────────
 
@@ -137,7 +137,7 @@ export default function AdminPage() {
 }
 
 function AdminPanel() {
-  const { refreshForumUser } = useAuth();
+  const { firebaseUser, refreshForumUser } = useAuth();
   const [users, setUsers] = useState<ForumUser[]>([]);
   const [mas, setMas] = useState<MA[]>([]);
   const [loading, setLoading] = useState(true);
@@ -188,6 +188,9 @@ function AdminPanel() {
   const [seedRotationBusy, setSeedRotationBusy] = useState(false);
   const [seedRotationResult, setSeedRotationResult] = useState<string | null>(null);
   const [seedRotationError, setSeedRotationError] = useState<string | null>(null);
+  const [migrateBusy, setMigrateBusy] = useState(false);
+  const [migrateResult, setMigrateResult] = useState<string | null>(null);
+  const [migrateError, setMigrateError] = useState<string | null>(null);
 
   // Access check
   const [checkBusy, setCheckBusy] = useState(false);
@@ -441,6 +444,27 @@ function AdminPanel() {
     }
   };
 
+  const onMigrateConfidential = async () => {
+    if (!firebaseUser) return;
+    setMigrateBusy(true);
+    setMigrateResult(null);
+    setMigrateError(null);
+    try {
+      const idToken = await firebaseUser.getIdToken();
+      const res = await fetch("/api/migrate-confidential", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      const json = await res.json() as { migrated?: number; results?: { name: string; status: string }[]; error?: string };
+      if (!res.ok) throw new Error(json.error ?? "Migration failed");
+      setMigrateResult(`Done — ${json.migrated ?? 0} MA(s) migrated. Sensitive data moved to maConfidential.`);
+    } catch (err) {
+      setMigrateError(err instanceof Error ? err.message : "Migration failed");
+    } finally {
+      setMigrateBusy(false);
+    }
+  };
+
   const onSeedLeadership = async () => {
     setSeedBusy(true);
     setSeedResult(null);
@@ -613,6 +637,30 @@ function AdminPanel() {
         </div>
         {seedRotationError && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{seedRotationError}</p>}
         {seedRotationResult && <p className="mt-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">{seedRotationResult}</p>}
+      </section>
+
+      {/* ── Migrate sensitive data to maConfidential ── */}
+      <section className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-garena-dark">Migrate sensitive data to maConfidential</h2>
+            <p className="mt-0.5 text-xs text-garena-dark/55">
+              Moves strengths, areas for development, and performance grades out of the public <code className="rounded bg-black/5 px-1">mas</code> collection
+              into the restricted <code className="rounded bg-black/5 px-1">maConfidential</code> collection so participants cannot read them.
+              Run this once after deploying the updated Firestore rules. Safe to re-run.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void onMigrateConfidential()}
+            disabled={migrateBusy}
+            className="rounded-md bg-amber-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {migrateBusy ? "Migrating…" : "Run migration"}
+          </button>
+        </div>
+        {migrateError && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{migrateError}</p>}
+        {migrateResult && <p className="mt-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">{migrateResult}</p>}
       </section>
 
       {/* ── Add MA Profile ── */}
@@ -1049,23 +1097,33 @@ function MATableRow({
   const [editing, setEditing] = useState(false);
   const [joinYear, setJoinYear] = useState<string>(m.joinYear?.toString() ?? "");
   const [school, setSchool] = useState<string>(m.school ?? "");
-  const [rotations, setRotations] = useState<Rotation[]>(
-    m.rotations.length > 0 ? m.rotations : []
-  );
-  const [strengthsDraft, setStrengthsDraft] = useState<string>((m.strengths ?? []).join("\n"));
-  const [areasDraft, setAreasDraft] = useState<string>((m.areasForDevelopment ?? []).join("\n"));
+  const [rotations, setRotations] = useState<Rotation[]>(m.rotations.length > 0 ? m.rotations : []);
+  const [confidential, setConfidential] = useState<MAConfidential | null>(null);
+  const [strengthsDraft, setStrengthsDraft] = useState<string>("");
+  const [areasDraft, setAreasDraft] = useState<string>("");
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveSuccess, setSaveSuccess] = useState(false);
 
-  // Reset local state when parent MA changes (e.g. after reload)
+  // Fetch confidential data when edit panel opens
+  useEffect(() => {
+    if (!editing) return;
+    void getMaConfidential(m.id).then((conf) => {
+      setConfidential(conf);
+      setStrengthsDraft((conf?.strengths ?? []).join("\n"));
+      setAreasDraft((conf?.areasForDevelopment ?? []).join("\n"));
+      setRotations(m.rotations.map((r) => ({
+        ...r,
+        performanceGrade: conf?.rotationGrades?.[r.label] ?? null,
+      })));
+    });
+  }, [editing, m.id, m.rotations]);
+
+  // Reset non-confidential state when parent MA changes
   useEffect(() => {
     setJoinYear(m.joinYear?.toString() ?? "");
     setSchool(m.school ?? "");
-    setRotations(m.rotations.length > 0 ? m.rotations : []);
-    setStrengthsDraft((m.strengths ?? []).join("\n"));
-    setAreasDraft((m.areasForDevelopment ?? []).join("\n"));
-  }, [m.joinYear, m.school, m.rotations, m.strengths, m.areasForDevelopment]);
+  }, [m.joinYear, m.school]);
 
   const addRotation = () => {
     const usedLabels = new Set(rotations.map((r) => r.label));

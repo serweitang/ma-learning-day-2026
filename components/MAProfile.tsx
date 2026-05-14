@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const LABEL_ORDER: Record<string, number> = { "Pre-MA Internship": 0, R1: 1, R2: 2, R3: 3, R4: 4 };
 
@@ -26,10 +26,10 @@ function resolveCurrentRotationDept(rotations: { label: string; department: stri
 }
 import { useAuth } from "@/components/AuthProvider";
 import { canUploadMemo, canEditMaProfile, canViewLeadershipData } from "@/lib/auth";
-import { getMa, setMaMemoUploaded, updateMaBio, updateMaLeadershipData } from "@/lib/firestore";
+import { getMa, getMaConfidential, setMaMemoUploaded, updateMaBio, updateMaLeadershipData } from "@/lib/firestore";
 import { formatSgt } from "@/lib/datetime";
 import dynamic from "next/dynamic";
-import type { MA } from "@/types";
+import type { MA, MAConfidential } from "@/types";
 const PDFViewer = dynamic(
   () => import("@/components/PDFViewer").then((m) => m.PDFViewer),
   { ssr: false, loading: () => <div className="flex h-48 items-center justify-center text-sm text-garena-dark/40">Loading PDF…</div> }
@@ -49,8 +49,9 @@ export function MAProfile({ initial }: Props) {
   const [editingBio, setEditingBio] = useState(false);
   const [editingStrengths, setEditingStrengths] = useState(false);
   const [editingAreas, setEditingAreas] = useState(false);
-  const [strengthsDraft, setStrengthsDraft] = useState((initial.strengths ?? []).join("\n"));
-  const [areasDraft, setAreasDraft] = useState((initial.areasForDevelopment ?? []).join("\n"));
+  const [confidential, setConfidential] = useState<MAConfidential | null>(null);
+  const [strengthsDraft, setStrengthsDraft] = useState("");
+  const [areasDraft, setAreasDraft] = useState("");
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingQuote, setPendingQuote] = useState<string | null>(null);
@@ -64,6 +65,20 @@ export function MAProfile({ initial }: Props) {
     () => canViewLeadershipData(forumUser),
     [forumUser]
   );
+
+  const refreshConfidential = async () => {
+    if (!canViewLeadership) return;
+    const conf = await getMaConfidential(ma.id);
+    setConfidential(conf);
+    setStrengthsDraft((conf?.strengths ?? []).join("\n"));
+    setAreasDraft((conf?.areasForDevelopment ?? []).join("\n"));
+  };
+
+  useEffect(() => {
+    if (!canViewLeadership) return;
+    void refreshConfidential();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canViewLeadership, ma.id]);
 
   const viewBadge = forumUser
     ? forumUser.role === "admin"
@@ -93,6 +108,7 @@ export function MAProfile({ initial }: Props) {
   const refresh = async () => {
     const latest = await getMa(ma.id);
     if (latest) setMa(latest);
+    await refreshConfidential();
   };
 
   const saveBio = async () => {
@@ -111,9 +127,9 @@ export function MAProfile({ initial }: Props) {
     try {
       await updateMaLeadershipData(ma.id, {
         strengths: strengthsDraft.split("\n").map((s) => s.trim()).filter(Boolean),
-        areasForDevelopment: ma.areasForDevelopment,
+        areasForDevelopment: confidential?.areasForDevelopment ?? null,
       });
-      await refresh();
+      await refreshConfidential();
       setEditingStrengths(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save");
@@ -124,10 +140,10 @@ export function MAProfile({ initial }: Props) {
     setError(null);
     try {
       await updateMaLeadershipData(ma.id, {
-        strengths: ma.strengths,
+        strengths: confidential?.strengths ?? null,
         areasForDevelopment: areasDraft.split("\n").map((s) => s.trim()).filter(Boolean),
       });
-      await refresh();
+      await refreshConfidential();
       setEditingAreas(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not save");
@@ -310,9 +326,9 @@ export function MAProfile({ initial }: Props) {
                       <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${ROTATION_PILL_COLORS[r.label] ?? "bg-garena-red/10 text-garena-red"}`}>
                         {r.label}
                       </span>
-                      {canViewLeadership && r.performanceGrade && (
+                      {canViewLeadership && confidential?.rotationGrades?.[r.label] && (
                         <span className="whitespace-nowrap text-xs font-medium text-garena-dark/70">
-                          [{r.performanceGrade}]
+                          [{confidential.rotationGrades[r.label]}]
                         </span>
                       )}
                     </div>
@@ -357,19 +373,19 @@ export function MAProfile({ initial }: Props) {
               ) : (
                 <>
                   <ul className="flex-1 space-y-1">
-                    {(ma.strengths ?? []).map((s, i) => (
+                    {(confidential?.strengths ?? []).map((s, i) => (
                       <li key={i} className="flex items-start gap-1.5 text-sm text-garena-dark/90">
                         <span className="mt-1 shrink-0 text-xs">•</span>
                         <span>{s}</span>
                       </li>
                     ))}
-                    {!(ma.strengths?.length) && forumUser?.role === "admin" && (
+                    {!(confidential?.strengths?.length) && forumUser?.role === "admin" && (
                       <li className="text-sm italic text-garena-dark/40">No strengths added yet.</li>
                     )}
                   </ul>
                   {forumUser?.role === "admin" && (
                     <div className="mt-3 flex justify-end">
-                      <button type="button" className="text-sm font-medium text-garena-red hover:underline" onClick={() => { setStrengthsDraft((ma.strengths ?? []).join("\n")); setEditingStrengths(true); }}>Edit</button>
+                      <button type="button" className="text-sm font-medium text-garena-red hover:underline" onClick={() => { setStrengthsDraft((confidential?.strengths ?? []).join("\n")); setEditingStrengths(true); }}>Edit</button>
                     </div>
                   )}
                 </>
@@ -397,19 +413,19 @@ export function MAProfile({ initial }: Props) {
               ) : (
                 <>
                   <ul className="flex-1 space-y-1">
-                    {(ma.areasForDevelopment ?? []).map((a, i) => (
+                    {(confidential?.areasForDevelopment ?? []).map((a, i) => (
                       <li key={i} className="flex items-start gap-1.5 text-sm text-garena-dark/90">
                         <span className="mt-1 shrink-0 text-xs">•</span>
                         <span>{a}</span>
                       </li>
                     ))}
-                    {!(ma.areasForDevelopment?.length) && forumUser?.role === "admin" && (
+                    {!(confidential?.areasForDevelopment?.length) && forumUser?.role === "admin" && (
                       <li className="text-sm italic text-garena-dark/40">No areas added yet.</li>
                     )}
                   </ul>
                   {forumUser?.role === "admin" && (
                     <div className="mt-3 flex justify-end">
-                      <button type="button" className="text-sm font-medium text-garena-red hover:underline" onClick={() => { setAreasDraft((ma.areasForDevelopment ?? []).join("\n")); setEditingAreas(true); }}>Edit</button>
+                      <button type="button" className="text-sm font-medium text-garena-red hover:underline" onClick={() => { setAreasDraft((confidential?.areasForDevelopment ?? []).join("\n")); setEditingAreas(true); }}>Edit</button>
                     </div>
                   )}
                 </>

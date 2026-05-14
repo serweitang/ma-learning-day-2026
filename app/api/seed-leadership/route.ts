@@ -141,10 +141,11 @@ export async function POST(req: NextRequest) {
       const name = (maDoc.data().name ?? "").trim().toLowerCase();
       const data = LEADERSHIP_DATA[name];
       if (data) {
-        batch.update(maDoc.ref, {
+        const confRef = firestoreDb.collection("maConfidential").doc(maDoc.id);
+        batch.set(confRef, {
           strengths: data.strengths,
           areasForDevelopment: data.areasForDevelopment,
-        });
+        }, { merge: true });
         results.push({ name: maDoc.data().name as string, status: "updated" });
         updateCount++;
       } else {

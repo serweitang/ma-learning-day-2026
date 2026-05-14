@@ -70,6 +70,13 @@ export interface Reaction {
   type: ReactionType;
 }
 
+/** Sensitive per-MA data stored in `maConfidential/{maId}` — readable only by admin and leadership. */
+export interface MAConfidential {
+  strengths: string[] | null;
+  areasForDevelopment: string[] | null;
+  rotationGrades: Record<string, string | null>;
+}
+
 /** Pre-assigned role before the user signs in (processed in `ensureUserDocument`). */
 export interface UserInvite {
   email: string;

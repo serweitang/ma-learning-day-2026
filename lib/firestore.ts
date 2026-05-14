@@ -16,7 +16,7 @@ import {
   type Unsubscribe,
 } from "firebase/firestore";
 import { db } from "@/config/firebase";
-import type { Comment, ForumUser, MA, Reaction, ReactionType, Rotation, UserRole } from "@/types";
+import type { Comment, ForumUser, MA, MAConfidential, Reaction, ReactionType, Rotation, UserRole } from "@/types";
 
 function reactionDocId(maId: string, authorUid: string): string {
   return `${maId}_${authorUid}`;
@@ -91,10 +91,22 @@ export async function deleteMa(maId: string): Promise<void> {
   await deleteDoc(doc(db, "mas", maId));
 }
 
+export async function getMaConfidential(maId: string): Promise<MAConfidential | null> {
+  const snap = await getDoc(doc(db, "maConfidential", maId));
+  if (!snap.exists()) return null;
+  const d = snap.data();
+  return {
+    strengths: Array.isArray(d.strengths) ? (d.strengths as string[]) : null,
+    areasForDevelopment: Array.isArray(d.areasForDevelopment) ? (d.areasForDevelopment as string[]) : null,
+    rotationGrades: (d.rotationGrades as Record<string, string | null>) ?? {},
+  };
+}
+
 export async function updateMaRotations(maId: string, rotations: Rotation[]): Promise<void> {
+  const publicRotations = rotations.map(({ performanceGrade: _g, ...rest }) => rest);
   await setDoc(
     doc(db, "mas", maId),
-    { rotations, updatedAt: serverTimestamp() },
+    { rotations: publicRotations, updatedAt: serverTimestamp() },
     { merge: true }
   );
 }
@@ -110,7 +122,9 @@ export async function updateMaBio(maId: string, bio: string): Promise<void> {
   );
 }
 
-/** Admin-only: update joinYear, school, rotations, strengths, and areasForDevelopment on an MA profile. */
+/** Admin-only: update joinYear, school, and rotations on the public MA profile.
+ *  Sensitive fields (strengths, areasForDevelopment, performanceGrades) are
+ *  written to `maConfidential` so participants cannot read them. */
 export async function updateMaProfile(
   maId: string,
   data: {
@@ -121,32 +135,33 @@ export async function updateMaProfile(
     areasForDevelopment: string[] | null;
   }
 ): Promise<void> {
+  // Public write — strip performanceGrade so it never lands in `mas`
+  const publicRotations = data.rotations.map(({ performanceGrade: _g, ...rest }) => rest);
   await setDoc(
     doc(db, "mas", maId),
-    {
-      joinYear: data.joinYear,
-      school: data.school,
-      rotations: data.rotations,
-      strengths: data.strengths,
-      areasForDevelopment: data.areasForDevelopment,
-      updatedAt: serverTimestamp(),
-    },
+    { joinYear: data.joinYear, school: data.school, rotations: publicRotations, updatedAt: serverTimestamp() },
+    { merge: true }
+  );
+
+  // Sensitive write — grades + strengths + areas go to restricted collection
+  const rotationGrades: Record<string, string | null> = {};
+  for (const r of data.rotations) rotationGrades[r.label] = r.performanceGrade ?? null;
+  await setDoc(
+    doc(db, "maConfidential", maId),
+    { strengths: data.strengths ?? null, areasForDevelopment: data.areasForDevelopment ?? null, rotationGrades },
     { merge: true }
   );
 }
 
-/** Admin-only: update only the leadership-visible fields (strengths, areasForDevelopment). */
+/** Admin-only: update only the leadership-visible fields (strengths, areasForDevelopment).
+ *  Writes to `maConfidential` — never to the public `mas` document. */
 export async function updateMaLeadershipData(
   maId: string,
   data: { strengths: string[] | null; areasForDevelopment: string[] | null }
 ): Promise<void> {
   await setDoc(
-    doc(db, "mas", maId),
-    {
-      strengths: data.strengths,
-      areasForDevelopment: data.areasForDevelopment,
-      updatedAt: serverTimestamp(),
-    },
+    doc(db, "maConfidential", maId),
+    { strengths: data.strengths, areasForDevelopment: data.areasForDevelopment },
     { merge: true }
   );
 }

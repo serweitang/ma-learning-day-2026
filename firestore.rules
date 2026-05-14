@@ -48,6 +48,14 @@ service cloud.firestore {
             && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.maId == maId);
     }
 
+    // ── maConfidential ───────────────────────────────────────────────────────────
+    // Sensitive per-MA data (strengths, areas for development, performance grades).
+    // Readable only by admins and leadership — never by participants or MAs.
+    match /maConfidential/{maId} {
+      allow read: if isAdmin() || isLeadership();
+      allow write: if isAdmin();
+    }
+
     // ── comments ─────────────────────────────────────────────────────────────────
     // Any authenticated user can read and create.
     // Authors can edit/delete their own; admins can delete any.
