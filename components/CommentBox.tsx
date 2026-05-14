@@ -12,7 +12,7 @@ const MAX_CHARS = 1000;
 
 type Props = {
   comment: Comment;
-  onReply?: (commentId: string, authorName: string) => void;
+  onReply?: (commentId: string) => void;
   isReply?: boolean;
   replyToDisplayName?: string | null;
 };
@@ -130,7 +130,7 @@ export function CommentBox({ comment, onReply, isReply = false, replyToDisplayNa
                 <button
                   type="button"
                   className="text-garena-dark/50 hover:text-garena-red"
-                  onClick={() => onReply(comment.id, comment.authorName)}
+                  onClick={() => onReply(comment.id)}
                 >
                   ↩ Reply
                 </button>
