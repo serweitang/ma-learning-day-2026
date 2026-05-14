@@ -7,7 +7,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { listMas } from "@/lib/firestore";
 import type { MA, Rotation } from "@/types";
 
-const LABEL_ORDER: Record<string, number> = { R1: 1, R2: 2, R3: 3, R4: 4 };
+const LABEL_ORDER: Record<string, number> = { "Pre-MA Internship": 0, R1: 1, R2: 2, R3: 3, R4: 4 };
 
 function currentRotation(ma: MA): Rotation | null {
   if (!ma.rotations.length) return null;

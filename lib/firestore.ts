@@ -91,6 +91,14 @@ export async function deleteMa(maId: string): Promise<void> {
   await deleteDoc(doc(db, "mas", maId));
 }
 
+export async function updateMaRotations(maId: string, rotations: Rotation[]): Promise<void> {
+  await setDoc(
+    doc(db, "mas", maId),
+    { rotations, updatedAt: serverTimestamp() },
+    { merge: true }
+  );
+}
+
 export async function updateMaBio(maId: string, bio: string): Promise<void> {
   await setDoc(
     doc(db, "mas", maId),

@@ -16,7 +16,7 @@ export interface ForumUser {
   createdAt: Timestamp;
 }
 
-export type RotationLabel = "R1" | "R2" | "R3" | "R4";
+export type RotationLabel = "R1" | "R2" | "R3" | "R4" | "Pre-MA Internship";
 
 export interface Rotation {
   label: RotationLabel;

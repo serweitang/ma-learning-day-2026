@@ -2,9 +2,10 @@
 
 import { useMemo, useState } from "react";
 
-const LABEL_ORDER: Record<string, number> = { R1: 1, R2: 2, R3: 3, R4: 4 };
+const LABEL_ORDER: Record<string, number> = { "Pre-MA Internship": 0, R1: 1, R2: 2, R3: 3, R4: 4 };
 
 const ROTATION_PILL_COLORS: Record<string, string> = {
+  "Pre-MA Internship": "bg-white text-slate-500 border border-slate-200",
   R1: "bg-blue-100 text-blue-700",
   R2: "bg-emerald-100 text-emerald-700",
   R3: "bg-amber-100 text-amber-700",
@@ -304,20 +305,20 @@ export function MAProfile({ initial }: Props) {
               <p className="mb-2 text-sm font-semibold text-garena-dark">Rotations Info</p>
               <ul className="space-y-2">
                 {ma.rotations.map((r) => (
-                  <li key={r.label}>
-                    <div className="flex w-full items-start gap-[10px]">
-                      <span className={`flex w-8 shrink-0 items-center justify-center rounded-full py-0.5 text-xs font-semibold ${ROTATION_PILL_COLORS[r.label] ?? "bg-garena-red/10 text-garena-red"}`}>
+                  <li key={r.label} className="rounded-lg border border-blue-200 bg-white/70 px-3 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold ${ROTATION_PILL_COLORS[r.label] ?? "bg-garena-red/10 text-garena-red"}`}>
                         {r.label}
                       </span>
-                      <span className="flex-1 text-sm text-garena-dark">{r.department}</span>
-                      {canViewLeadership && (
-                        <span className="min-w-[36px] shrink-0 whitespace-nowrap text-right text-xs font-medium text-garena-dark/70">
-                          {r.performanceGrade ? `[${r.performanceGrade}]` : ""}
+                      {canViewLeadership && r.performanceGrade && (
+                        <span className="whitespace-nowrap text-xs font-medium text-garena-dark/70">
+                          [{r.performanceGrade}]
                         </span>
                       )}
                     </div>
+                    <p className="mt-1 text-sm text-garena-dark/80">{r.department}</p>
                     {(r.learningMemoUrl || r.presentationUrl) && (
-                      <div className="mt-0.5 flex items-center gap-3 pl-[42px]">
+                      <div className="mt-1 flex items-center gap-3">
                         {r.learningMemoUrl && (
                           <a href={r.learningMemoUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-garena-dark/60 hover:text-garena-red">
                             <span>📄</span> Learning Memo

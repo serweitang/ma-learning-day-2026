@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AdminGuard } from "@/components/AdminGuard";
 import { useAuth } from "@/components/AuthProvider";
-import { createMa, createUser, deleteMa, getUserByEmail, grantInvite, listMas, listUserInvites, listUsers, updateMaBulk, updateMaProfile, updateMaLeadershipData, updateUserRole } from "@/lib/firestore";
+import { createMa, createUser, deleteMa, getUserByEmail, grantInvite, listMas, listUserInvites, listUsers, updateMaBulk, updateMaProfile, updateMaLeadershipData, updateMaRotations, updateUserRole } from "@/lib/firestore";
 import type { ForumUser, MA, Rotation, RotationLabel, UserRole } from "@/types";
 
 // ── Leadership seed data ─────────────────────────────────────────────────────
@@ -185,6 +185,9 @@ function AdminPanel() {
   const [seedBusy, setSeedBusy] = useState(false);
   const [seedResult, setSeedResult] = useState<string | null>(null);
   const [seedError, setSeedError] = useState<string | null>(null);
+  const [seedRotationBusy, setSeedRotationBusy] = useState(false);
+  const [seedRotationResult, setSeedRotationResult] = useState<string | null>(null);
+  const [seedRotationError, setSeedRotationError] = useState<string | null>(null);
 
   // Access check
   const [checkBusy, setCheckBusy] = useState(false);
@@ -409,6 +412,35 @@ function AdminPanel() {
     }
   };
 
+  const onSeedHaolinRotation = async () => {
+    setSeedRotationBusy(true);
+    setSeedRotationResult(null);
+    setSeedRotationError(null);
+    try {
+      const currentMas = await listMas();
+      const haolin = currentMas.find((m) => m.name.trim().toLowerCase() === "chen haolin");
+      if (!haolin) {
+        setSeedRotationError("Chen Haolin not found in database.");
+        return;
+      }
+      const alreadyHas = haolin.rotations.some((r) => r.label === "Pre-MA Internship");
+      if (alreadyHas) {
+        setSeedRotationResult("Chen Haolin already has a Pre-MA Internship rotation.");
+        return;
+      }
+      await updateMaRotations(haolin.id, [
+        ...haolin.rotations,
+        { label: "Pre-MA Internship", department: "Free Fire Dev PM", learningMemoUrl: null, presentationUrl: null, performanceGrade: null },
+      ]);
+      setSeedRotationResult("Added Pre-MA Internship rotation (Free Fire Dev PM) for Chen Haolin.");
+      await load();
+    } catch (err) {
+      setSeedRotationError(err instanceof Error ? err.message : "Seed failed");
+    } finally {
+      setSeedRotationBusy(false);
+    }
+  };
+
   const onSeedLeadership = async () => {
     setSeedBusy(true);
     setSeedResult(null);
@@ -561,6 +593,26 @@ function AdminPanel() {
         </div>
         {seedError && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{seedError}</p>}
         {seedResult && <p className="mt-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">{seedResult}</p>}
+      </section>
+
+      {/* ── Seed Chen Haolin rotation ── */}
+      <section className="mt-6 rounded-xl border border-black/10 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-garena-dark">Seed Chen Haolin rotation</h2>
+            <p className="mt-0.5 text-xs text-garena-dark/55">Adds the Pre-MA Internship rotation (Free Fire Dev PM) to Chen Haolin&apos;s profile. Safe to run multiple times.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void onSeedHaolinRotation()}
+            disabled={seedRotationBusy}
+            className="rounded-md bg-garena-dark px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+          >
+            {seedRotationBusy ? "Seeding…" : "Seed now"}
+          </button>
+        </div>
+        {seedRotationError && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{seedRotationError}</p>}
+        {seedRotationResult && <p className="mt-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">{seedRotationResult}</p>}
       </section>
 
       {/* ── Add MA Profile ── */}
@@ -969,7 +1021,7 @@ function isValidUrl(url: string): boolean {
 
 // ── MA Table Row (with inline profile editor) ─────────────────────────────────
 
-const ROTATION_LABELS: RotationLabel[] = ["R1", "R2", "R3", "R4"];
+const ROTATION_LABELS: RotationLabel[] = ["R1", "R2", "R3", "R4", "Pre-MA Internship"];
 
 function emptyRotation(label: RotationLabel): Rotation {
   return { label, department: "", learningMemoUrl: null, presentationUrl: null, performanceGrade: null };
