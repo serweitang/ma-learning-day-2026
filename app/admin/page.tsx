@@ -1116,6 +1116,8 @@ function MATableRow({
         ...r,
         performanceGrade: conf?.rotationGrades?.[r.label] ?? null,
       })));
+    }).catch(() => {
+      // Firestore rules not yet deployed — edit panel still works without confidential data
     });
   }, [editing, m.id, m.rotations]);
 

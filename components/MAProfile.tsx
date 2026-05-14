@@ -68,10 +68,14 @@ export function MAProfile({ initial }: Props) {
 
   const refreshConfidential = async () => {
     if (!canViewLeadership) return;
-    const conf = await getMaConfidential(ma.id);
-    setConfidential(conf);
-    setStrengthsDraft((conf?.strengths ?? []).join("\n"));
-    setAreasDraft((conf?.areasForDevelopment ?? []).join("\n"));
+    try {
+      const conf = await getMaConfidential(ma.id);
+      setConfidential(conf);
+      setStrengthsDraft((conf?.strengths ?? []).join("\n"));
+      setAreasDraft((conf?.areasForDevelopment ?? []).join("\n"));
+    } catch {
+      // Firestore rules not yet deployed or user lacks access — fail silently
+    }
   };
 
   useEffect(() => {
