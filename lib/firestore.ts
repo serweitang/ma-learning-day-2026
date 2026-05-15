@@ -137,6 +137,7 @@ export async function updateMaProfile(
   }
 ): Promise<void> {
   // Public write — strip performanceGrade so it never lands in `mas`
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const publicRotations = data.rotations.map(({ performanceGrade: _g, ...rest }) => rest);
   await setDoc(
     doc(db, "mas", maId),

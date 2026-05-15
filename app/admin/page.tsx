@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { AdminGuard } from "@/components/AdminGuard";
 import { useAuth } from "@/components/AuthProvider";
 import { createMa, createUser, deleteMa, getMaConfidential, getUserByEmail, grantInvite, listMas, listUserInvites, listUsers, updateMaBulk, updateMaProfile, updateMaLeadershipData, updateMaRotations, updateUserRole } from "@/lib/firestore";
-import type { ForumUser, MA, MAConfidential, Rotation, RotationLabel, UserRole } from "@/types";
+import type { ForumUser, MA, Rotation, RotationLabel, UserRole } from "@/types";
 
 // ── Leadership seed data ─────────────────────────────────────────────────────
 
