@@ -103,6 +103,7 @@ export async function getMaConfidential(maId: string): Promise<MAConfidential | 
 }
 
 export async function updateMaRotations(maId: string, rotations: Rotation[]): Promise<void> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const publicRotations = rotations.map(({ performanceGrade: _g, ...rest }) => rest);
   await setDoc(
     doc(db, "mas", maId),

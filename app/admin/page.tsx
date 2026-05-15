@@ -1098,7 +1098,6 @@ function MATableRow({
   const [joinYear, setJoinYear] = useState<string>(m.joinYear?.toString() ?? "");
   const [school, setSchool] = useState<string>(m.school ?? "");
   const [rotations, setRotations] = useState<Rotation[]>(m.rotations.length > 0 ? m.rotations : []);
-  const [confidential, setConfidential] = useState<MAConfidential | null>(null);
   const [strengthsDraft, setStrengthsDraft] = useState<string>("");
   const [areasDraft, setAreasDraft] = useState<string>("");
   const [saving, setSaving] = useState(false);
@@ -1109,7 +1108,6 @@ function MATableRow({
   useEffect(() => {
     if (!editing) return;
     void getMaConfidential(m.id).then((conf) => {
-      setConfidential(conf);
       setStrengthsDraft((conf?.strengths ?? []).join("\n"));
       setAreasDraft((conf?.areasForDevelopment ?? []).join("\n"));
       setRotations(m.rotations.map((r) => ({

@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
       );
 
       // Strip sensitive fields from mas — write clean rotations array + delete top-level fields
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const cleanRotations = rotations.map(({ performanceGrade: _g, ...rest }: Record<string, unknown>) => rest);
       await maDoc.ref.update({
         rotations: cleanRotations,
