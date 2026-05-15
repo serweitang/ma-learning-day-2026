@@ -18,7 +18,7 @@ export function HorseIcon({ id }: Props) {
     <button
       type="button"
       onClick={() => void recordFound(id)}
-      className="inline-block cursor-pointer select-none text-sm opacity-10 transition-opacity duration-200 hover:opacity-90 focus:outline-none"
+      className="inline-block cursor-pointer select-none text-xl opacity-10 transition-opacity duration-200 hover:opacity-90 focus:outline-none"
       aria-label="???"
     >
       🐴
