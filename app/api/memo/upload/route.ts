@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth } from "@/config/firebaseAdmin";
+import { adminAuth, adminDb } from "@/config/firebaseAdmin";
 import { uploadToSupabase } from "@/lib/supabaseStorage";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/config/firebase";
 
 export const dynamic = "force-dynamic";
 
@@ -22,9 +20,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid token" }, { status: 401 });
   }
 
-  // 2. Load user role from Firestore
-  const userSnap = await getDoc(doc(db, "users", uid));
-  if (!userSnap.exists()) {
+  // 2. Load user role from Firestore (Admin SDK — safe for server-side use)
+  const userSnap = await adminDb().collection("users").doc(uid).get();
+  if (!userSnap.exists) {
     return NextResponse.json({ error: "User not found" }, { status: 403 });
   }
   const user = userSnap.data() as { role: string; maId?: string | null };
@@ -55,8 +53,9 @@ export async function POST(req: NextRequest) {
   try {
     memoURL = await uploadToSupabase(maId, buffer);
   } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
     console.error("Supabase upload error:", e);
-    return NextResponse.json({ error: "Upload failed" }, { status: 500 });
+    return NextResponse.json({ error: `Upload failed: ${msg}` }, { status: 500 });
   }
 
   return NextResponse.json({ memoURL });

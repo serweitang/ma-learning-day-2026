@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 const LABEL_ORDER: Record<string, number> = { "Pre-MA Internship": 0, R1: 1, R2: 2, R3: 3, R4: 4 };
 
@@ -55,6 +55,7 @@ export function MAProfile({ initial }: Props) {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingQuote, setPendingQuote] = useState<string | null>(null);
+  const memoInputRef = useRef<HTMLInputElement>(null);
 
   const canEdit = useMemo(
     () => (forumUser ? canEditMaProfile(forumUser, ma.id) : false),
@@ -173,11 +174,13 @@ export function MAProfile({ initial }: Props) {
         body: formData,
       });
       if (!res.ok) {
-        const data = (await res.json()) as { error?: string };
-        throw new Error(data.error ?? "Upload failed");
+        let errMsg = "Upload failed";
+        try { const d = (await res.json()) as { error?: string }; errMsg = d.error ?? errMsg; } catch { /* empty body */ }
+        throw new Error(errMsg);
       }
       const { memoURL } = (await res.json()) as { memoURL: string };
       await setMaMemoUploaded(ma.id, memoURL);
+      if (memoInputRef.current) memoInputRef.current.value = "";
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
@@ -449,6 +452,7 @@ export function MAProfile({ initial }: Props) {
                 Only one PDF per MA — uploading replaces the previous file.
               </p>
               <input
+                ref={memoInputRef}
                 type="file"
                 accept="application/pdf"
                 disabled={uploading}
@@ -465,12 +469,23 @@ export function MAProfile({ initial }: Props) {
                   Rotation Memo — {currentRotationDept}
                 </h2>
               )}
-              <PDFViewer url={ma.memoURL} title={`${ma.name} memo`} onQuote={setPendingQuote} />
-              {memoTime && (
-                <p className="text-xs text-garena-dark/50">
-                  Last updated: {memoTime} SGT
-                </p>
-              )}
+              <PDFViewer key={ma.memoURL} url={ma.memoURL} title={`${ma.name} memo`} onQuote={setPendingQuote} />
+              <div className="flex items-center justify-between">
+                <a
+                  href={ma.memoURL}
+                  download={`${ma.name}_memo.pdf`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-md bg-garena-dark px-3 py-1.5 text-xs font-medium text-white hover:bg-garena-dark/80 transition-colors"
+                >
+                  Download PDF
+                </a>
+                {memoTime && (
+                  <p className="text-xs text-garena-dark/50">
+                    Last updated: {memoTime} SGT
+                  </p>
+                )}
+              </div>
             </div>
           ) : (
             <div className="rounded-xl border border-black/10 bg-white p-6 text-garena-dark/80">
